@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <stdio.h>
 #include <math.h>
 #include <omp.h>
@@ -8,8 +9,7 @@ struct Node {
   struct Node* left;
   struct Node* right;
  
-  Node(float* _points, int _n)
-  {
+  Node(float* _points, int _n) {
     points = _points;
     n = _n;
     left = NULL;
@@ -18,26 +18,26 @@ struct Node {
 };
 
 void build_tree(Node* tree, float* points, int n) {
-  return
+  return;
 }
 
 int get_targets(float* targets, int l, int k) {
-  return 0
+  return 0;
 }
 
 int get_interaction_list(float* sources, int l, int k) {
-  return 0
+  return 0;
 }
 
-void barnes_hut(Node* tree, int n) {
+void barnes_hut(Node* tree, int n, int p) {
   // allocate temporary vectors to store source and target points during the computation
   float* sources = (float*) malloc(n * sizeof(float));
   float* targets = (float*) malloc(n * sizeof(float));
 
-  j = floor(log2(n));
+  int j = floor(log2(n));
   // Compute the weight (bottom to top)
   for (int l = j-1; l >= 0; l--) {
-    for (int k = 0; k < pow(2, L); k++) {
+    for (int k = 0; k < pow(2, l); k++) {
       for (int m = 0; m < p; m++) {
         // TODO: compute w(L,k,m);
       }
@@ -49,7 +49,7 @@ void barnes_hut(Node* tree, int n) {
     for (int k = 0; k < pow(2, l); k++) {
       // write relevant targets into temporary targets vector, where nt_lk gives the number of targets in T_{l,k}
       int nt_lk = get_targets(targets, l, k); 
-      for (i = 0; i < nt_lk; i++) {
+      for (int i = 0; i < nt_lk; i++) {
         float y = targets[i];
         for (int m = 0; m < p; m++) { // far-field
           // write relevant sources into temporary sources vector, where ns_lk gives the number of sources in the interaction list of T_{l,k}
@@ -67,11 +67,15 @@ void barnes_hut(Node* tree, int n) {
   }
 }
 
-
 int main() {
+  int n = 100; // number of points
+  int p = 5; // number of terms in multipole expansion
+
+  float* points = (float*) malloc(n * sizeof(float));
+
   struct Node* tree = new Node(NULL, 0);
 
   build_tree(tree, points, n);
 
-  barnes_hut(tree, 0);
+  barnes_hut(tree, n, p);
 }
