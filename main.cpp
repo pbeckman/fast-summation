@@ -5,24 +5,31 @@
 #include <iostream>
 
 struct Node {
-  float* points = NULL;
-  int n = 0;
-  struct Node* left;
-  struct Node* right;
+  double* x = NULL;    // array of points
+  double* q = NULL;    // array of charges
+  int n = 0;          // number of points 
+  double c = 0;        // center
+  double* w = NULL;    // weights
+  int p = 0;           // number of weights
+  struct Node* left  = NULL; // left child node
+  struct Node* right = NULL; // right child node
  
-  Node(float* _points, int _n) {
-    points = _points;
+  Node(double* _x, double* _q, int _n, double _c, int _p) {
+    x = _x;
+    q = _q;
     n = _n;
-    left = NULL;
-    right = NULL;
+    c = _c;
+    p = _p;
+    w = (double*) malloc(p * sizeof(double));
   }
 };
 
 Node* build_tree(
-  float* points, int n, int max_pts,
-  float a, float b
+  double* x, double* q, int n, int max_pts,
+  double a, double b, 
+  int p
   ) {
-  struct Node* tree = new Node(points, n);
+  struct Node* tree = new Node(x, q, n, (a+b)/2, p);
 
   // if there are more than max_pts points in the cell, keep subdividing
   if (n > max_pts) {
@@ -30,67 +37,76 @@ Node* build_tree(
     // using a for loop here is naive and slow, could use bisection
     int nleft = 0;
     for (int i = 0; i < n; i++) {
-      if (points[i] < (a+b)/2) {
+      if (x[i] < (a+b)/2) {
         nleft = i+1;
       }
     }
     int nright = n - nleft;
     if (nleft > 0 && nright > 0) { // avoid subdividing empty cells
       tree->left  = build_tree(
-        tree->points, nleft, max_pts, a, (a+b)/2
+        tree->x, tree->q, nleft, max_pts, a, (a+b)/2, p
         );
       tree->right = build_tree(
-        tree->points + nleft, nright, max_pts, (a+b)/2, b
+        tree->x + nleft, tree->q + nleft, nright, max_pts, (a+b)/2, b, p
         );
+      
     }
   }
   return tree;
 }
 
-int get_targets(float* targets, Node* tree, int l, int k) {
-  return 0;
+void compute_weights(Node* tree) {
+  for (int j = 0; j < tree->n; j++) {
+    for (int m = 0; m < tree->p; m++) {
+      // add weight q_j a_m(x[j] - c) = q_j (c - x[j])^m
+      tree->w[m] += tree->q[j] * pow((tree->c - tree->x[j]), m);
+    }
+  }
+
+  // traverse the tree
+  if (tree->left) {
+    compute_weights(tree->left); 
+    compute_weights(tree->right);
+  }
 }
 
-int get_interaction_list(float* sources, Node* tree, int l, int k) {
-  return 0;
+void compute_potential(double* u, int n, Node* tree) {
+  
 }
 
-void barnes_hut(float* u, int n, Node* tree, int p) {
+void barnes_hut(double* u, int n, Node* tree, int p) {
   // allocate temporary vectors to store source and target points during the computation
-  float* sources = (float*) malloc(n * sizeof(float));
-  float* targets = (float*) malloc(n * sizeof(float));
+  double* sources = (double*) malloc(n * sizeof(double));
+  double* targets = (double*) malloc(n * sizeof(double));
 
-  int j = floor(log2(n));
-  // Compute the weight (bottom to top)
-  for (int l = j-1; l >= 0; l--) {
-    for (int k = 0; k < pow(2, l); k++) {
-      for (int m = 0; m < p; m++) {
-        // TODO: compute w(L,k,m);
-      }
-    }
-  }
+  // compute the weights and store them in the tree
+  compute_weights(tree);
 
-  // Evaluate the potential (top to bottom)
-  for (int l = 0; l < j; l++) {
-    for (int k = 0; k < pow(2, l); k++) {
-      // write relevant targets into temporary targets vector, where nt_lk gives the number of targets in T_{l,k}
-      int nt_lk = get_targets(targets, tree, l, k); 
-      for (int i = 0; i < nt_lk; i++) {
-        float y = targets[i];
-        for (int m = 0; m < p; m++) { // far-field
-          // write relevant sources into temporary sources vector, where ns_lk gives the number of sources in the interaction list of T_{l,k}
-          int ns_lk = get_interaction_list(sources, tree, l, k); 
-          for (j = 0; j < ns_lk; i++) {
-            float s = sources[j];
-            // TODO: u(i) = u(i) + w(l,k,m) * Sm(xstar(l,s) - y);
-          }
-        }
-        if (l == j) { // near-field
-          // TODO: u(i) = u(i) + near-field(y(i), T(J,:));
-        }
-      }
-    }
-  }
+  // use the precomputed weights to compute the potential
+  compute_potential(u, n, tree);
+
+  // // Evaluate the potential (top to bottom)
+  // for (int l = 0; l < j; l++) {
+  //   for (int k = 0; k < pow(2, l); k++) {
+  //     // write relevant targets into temporary targets vector, where nt_lk gives the number of targets in T_{l,k}
+  //     int nt_lk = get_targets(targets, tree, l, k); 
+  //     for (int i = 0; i < nt_lk; i++) {
+  //       double y = targets[i];
+  //       for (int m = 0; m < p; m++) { // far-field
+  //         // write relevant sources into temporary sources vector, where ns_lk gives the number of sources in the interaction list of T_{l,k}
+  //         int ns_lk = get_interaction_list(sources, tree, l, k); 
+  //         for (j = 0; j < ns_lk; i++) {
+  //           double s = sources[j];
+  //           // TODO: u(i) = u(i) + w(l,k,m) * Sm(xstar(l,s) - y);
+  //         }
+  //       }
+  //       if (l == j) { // near-field
+  //         // TODO: u(i) = u(i) + near-field(y(i), T(J,:));
+  //       }
+  //     }
+  //   }
+  // }
+
 }
 
 int main() {
@@ -99,19 +115,23 @@ int main() {
   int p = 5; // number of terms in multipole expansion
 
   // draw and sort a set of n uniform random points in [0,1]
-  float* points = (float*) malloc(n * sizeof(float));
-  for (int i = 0; i < n; i++) points[i]  = ((double)rand()/RAND_MAX);
-  std::sort(points, points+n);
+  double* x = (double*) malloc(n * sizeof(double));
+  for (int i = 0; i < n; i++) x[i] = ((double)rand()/RAND_MAX);
+  std::sort(x, x+n);
+
+  // draw a set of n uniform random charges in [-1, 1]
+  double* q = (double*) malloc(n * sizeof(double));
+  for (int i = 0; i < n; i++) q[i] = 2*((double)rand()/RAND_MAX) - 1;
 
   // build a binary tree subdiving our points
-  Node* tree = build_tree(points, n, max_pts, 0, 1);
+  Node* tree = build_tree(x, q, n, max_pts, 0, 1, p);
 
   // allocate the potential
-  float* u = (float*) malloc(n * sizeof(float));
+  double* u = (double*) malloc(n * sizeof(double));
 
   // run barnes_hut
   barnes_hut(u, n, tree, p);
 
-  // display solution at source / target points
-  for (int i = 0; i < n; i++) printf("u(%.3f) = %.3f\n", points[i], u[i]);
+  // // display charges at source points
+  // for (int i = 0; i < n; i++) printf("u(%.3f) = %.3f\n", x[i], q[i]);
 }
