@@ -83,53 +83,47 @@ void compute_weights(Node* tree) {
 Node* get_left_interaction(Node* tree) {
   Node* node = tree->parent; // initialize node pointer we'll search tree with
   int l = 1; // how many levels have we moved up in our search
+  printf("search cell center is %.4f, l = %i\n", node->c, l);
   
   // ascend the tree until we are not the left child of our parent
-  while (node->parent->left == node) { 
+  while (node->parent && node->parent->left == node) { 
     node = node->parent;
     l++;
+    printf("ascending cell center is %.4f, l = %i\n", node->c, l);
   }
 
-  // now we're the right child of our parent
-  // so we cross the tree to be in the left branch
-  node = node->parent->left;
+  if (node->parent) {
+    // now we're the right child of our parent
+    // so we cross the tree to be in the left branch
+    node = node->parent->left;
+    printf("going left cell center is %.4f, l = %i\n", node->c, l);
 
-  // descend the tree to the right until we are one level above the base node
-  for (; l > 1; l--) node = node->right;
+    // descend the tree to the right until we are one level above the base node
+    for (; l > 1; l--) {
+      node = node->right;
+      printf("descending cell center is %.4f, l = %i\n", node->c, l);
+    }
 
-  // if the base node was originally a left node, the right child here
-  // is in the near field, so give only the left child
-  if (tree->parent->left == tree) {
-    node = node->left;
+    // if the base node was originally a left node, the right child here
+    // is in the near field, so give only the left child
+    if (tree->parent->left == tree) {
+      if (node->left) {
+        node = node->left;
+        l--;
+        printf("last split cell center is %.4f, l = %i\n", node->c, l);
+      } else {
+        // we can't go down to the correct level to get out of the near-field
+        // so we have no left interactions
+        return nullptr;
+      }
+    }
+
+    return node;
+  } else { 
+    // we're at the root node, which means we're the leftmost cell
+    // at this level, so we have no left interactions
+    return nullptr;
   }
-
-  return node;
-}
-
-Node* get_right_interaction(Node* tree) {
-  Node* node = tree->parent; // initialize node pointer we'll search tree with
-  int l = 1; // how many levels have we moved up in our search
-  
-  // ascend the tree until we are not the right child of our parent
-  while (node->parent->right == node) { 
-    node = node->parent;
-    l++;
-  }
-
-  // now we're the left child of our parent
-  // so we cross the tree to be in the right branch
-  node = node->parent->right;
-
-  // descend the tree to the left until we are one level above the base node
-  for (; l > 1; l--) node = node->left;
-
-  // if the base node was originally a right node, the left child here
-  // is in the near field, so give only the right child
-  if (tree->parent->right == tree) {
-    node = node->right;
-  }
-
-  return node;
 }
 
 void add_far_field(double* u, Node* tree, Node* node) {
@@ -150,11 +144,13 @@ void compute_potential(double* u, Node* tree) {
   if (tree->parent && tree->parent->parent) { 
     Node* node = NULL;
     
+    printf("computing left interaction for cell with center %.4f\n", tree->c);
     node = get_left_interaction(tree);
-    add_far_field(u, tree, node);
+    printf("adding far-field terms for cell with center %.4f\n", tree->c);
+    if (node) add_far_field(u, tree, node);
 
-    node = get_right_interaction(tree);
-    add_far_field(u, tree, node);
+    // node = get_right_interaction(tree);
+    // add_far_field(u, tree, node);
   }
 
   // traverse the tree
@@ -163,6 +159,7 @@ void compute_potential(double* u, Node* tree) {
     compute_potential(u, tree->left); 
     compute_potential(u, tree->right);
   } else {
+    printf("adding near-field terms for cell with center %.4f\n", tree->c);
     // evaluate near-field directly
     for (int i = 0; i < tree->n; i++) {
       for (int j = 0; j < tree->n; j++) {
