@@ -3,6 +3,7 @@
 #include <math.h>
 #include <omp.h>
 #include <iostream>
+#include "utils.h"
 
 struct Node {
   double* x = NULL; // array of points
@@ -209,10 +210,13 @@ void barnes_hut(double* u, int n, Node* tree, int p) {
   compute_potential(u, tree);
 }
 
-int main() {
-  int n = 16; // number of source / target points
-  int max_pts = 16; // maximum number of points per neighborhood
-  int p = 1; // number of terms in multipole expansion
+int main(int argc, char** argv) {
+  // number of source / target points
+  int n = read_option<int>("-n", argc, argv, "128");  
+  // maximum number of points per neighborhood
+  int max_pts = read_option<int>("-m", argc, argv, "8");
+  // number of terms in multipole expansion
+  int p = read_option<int>("-m", argc, argv, "1"); 
 
   // draw and sort a set of n uniform random points in [0,1]
   double* x = (double*) malloc(n * sizeof(double));
