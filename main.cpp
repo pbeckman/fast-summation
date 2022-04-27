@@ -190,8 +190,8 @@ void compute_potential(double* u, Node* tree) {
     for (int i = 0; i < tree->n; i++) {
       for (int j = 0; j < tree->n; j++) {
         if (i != j) {
-          // add exact potential q_i / |x[i] - x[j]|
-          u[tree->I[i]] += tree->q[i] / std::abs(tree->x[i] - tree->x[j]);
+          // add exact potential q_j / |x[i] - x[j]|
+          u[tree->I[i]] += tree->q[j] / std::abs(tree->x[i] - tree->x[j]);
         }
       }
     }
@@ -225,7 +225,7 @@ int main(int argc, char** argv) {
 
   // draw a set of n uniform random charges in [-1, 1]
   double* q = (double*) malloc(n * sizeof(double));
-  for (int i = 0; i < n; i++) q[i] = 2*((double)rand()/RAND_MAX) - 1;
+  for (int i = 0; i < n; i++) q[i] =  1;//2*((double)rand()/RAND_MAX) - 1;
 
   // make a simple index vector [0,...,n]
   int* I = (int*) malloc(n * sizeof(int));
