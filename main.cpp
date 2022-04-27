@@ -71,11 +71,11 @@ void compute_weights(Node* tree) {
     for (int m = 0; m < tree->p; m++) {
       // add weight term q_i a_m(x[i] - c) 
       // where a_m(x[i] - c) = (c - x[i])^m
-      printf("w[m]: %.3f ", tree->w[m]);
+      printf("w[%i]: %.3f ", m, tree->w[m]);
       tree->w[m] += tree->q[i] * std::pow((tree->c - tree->x[i]), m);
       printf(
-        "-> %.3f (q[i] = %.3f, x[i] = %.3f, c = %.3f)\n", 
-        tree->w[m], tree->q[i], tree->x[i], tree->c
+        "-> %.3f (q[%i] = %.3f, x[%i] = %.3f, c = %.3f)\n", 
+        tree->w[m], i, tree->q[i], i, tree->x[i], tree->c
         );
     }
   }
@@ -143,13 +143,13 @@ void add_far_field(double* u, Node* tree, Node* node) {
     for (int m = 0; m < tree->p; m++) {
       // add approximate potential term w_{i,m} * S_m(c - x[i]) 
       // where S_m(c - x[i]) = 1 / (|c - x[i]|*(c - x[i])^m)
-      printf("u[i]: %.3f ", u[tree->I[i]]);
+      printf("u[%i]: %.3f ", tree->I[i], u[tree->I[i]]);
       u[tree->I[i]] += node->w[m] / (
         std::abs(node->c - node->x[i])*std::pow(node->c - node->x[i], m)
         );
       printf(
-        "-> %.3f (w[m] = %.3f, x[i] = %.3f, c = %.3f)\n", 
-        u[tree->I[i]], node->w[m], node->x[i], node->c
+        "-> %.3f (w[%i] = %.3f, x[%i] = %.3f, c = %.3f)\n", 
+        u[tree->I[i]], m, node->w[m], i, node->x[i], node->c
         );
     }
   }
@@ -216,22 +216,23 @@ int main(int argc, char** argv) {
   // maximum number of points per neighborhood
   int max_pts = read_option<int>("-m", argc, argv, "8");
   // number of terms in multipole expansion
-  int p = read_option<int>("-m", argc, argv, "1"); 
+  int p = read_option<int>("-p", argc, argv, "1"); 
 
   // draw and sort a set of n uniform random points in [0,1]
   double* x = (double*) malloc(n * sizeof(double));
-  for (int i = 0; i < n; i++) x[i] = ((double)rand()/RAND_MAX); // ((double)i)/n;
+  for (int i = 0; i < n; i++) x[i] =  ((double)i)/n + 1e-3; // ((double)rand()/RAND_MAX);
   std::sort(x, x+n);
 
   // draw a set of n uniform random charges in [-1, 1]
   double* q = (double*) malloc(n * sizeof(double));
-  for (int i = 0; i < n; i++) q[i] = 1; // 2*((double)rand()/RAND_MAX) - 1;
+  for (int i = 0; i < n; i++) q[i] = 2*((double)rand()/RAND_MAX) - 1;
 
   // make a simple index vector [0,...,n]
   int* I = (int*) malloc(n * sizeof(int));
   for (int i = 0; i < n; i++) I[i] = i;
 
   // build a binary tree subdiving our points
+  printf("p = %i\n", p);
   Node* tree = build_tree(x, q, I, n, max_pts, 0, 1, p, NULL);
 
   // allocate the potential and initialize to zero
