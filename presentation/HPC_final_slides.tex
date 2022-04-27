@@ -1,0 +1,193 @@
+\documentclass{beamer}
+
+\usetheme{Boadilla} % or try Darmstadt, Madrid, Warsaw, ...
+\definecolor{NYU}{rgb}{0.33984375, 0.0234375, 0.546875}
+\usecolortheme[named=NYU]{structure} % or try albatross, beaver, crane, ...
+\usefonttheme{default}  % or try serif, structurebold, ...
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{caption}[numbered]
+
+\usepackage[english]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{parskip}
+\usepackage{amsmath, amsthm, amssymb, amsfonts, mathtools, xfrac, dsfont}
+\usepackage{hyperref}
+\usepackage{bm}
+
+% grouping and bookending
+\newcommand{\pr}[1]{\left(#1\right)}
+\newcommand{\br}[1]{\left[#1\right]}
+\newcommand{\cbr}[1]{\left\{#1\right\}}
+\newcommand{\floor}[1]{\left\lfloor#1\right\rfloor}
+\newcommand{\ceil}[1]{\left\lceil#1\right\rceil}
+\newcommand{\abs}[1]{\left|#1\right|}
+\newcommand{\norm}[1]{\left\lVert#1\right\rVert}
+\newcommand{\ip}[1]{\left\langle#1\right\rangle}
+\renewcommand{\vec}[1]{\left\langle#1\right\rangle}
+% derivatives
+\newcommand{\der}[2]{\frac{d #1}{d #2}}
+\newcommand{\mder}[2]{\frac{D #1}{D #2}}
+\newcommand{\pder}[2]{\frac{\partial #1}{\partial #2}}
+% common bold and script letters
+\newcommand{\C}{\mathbb{C}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\F}{\mathcal{F}}
+\newcommand{\G}{\mathcal{G}}
+\renewcommand{\L}{\mathscr{L}}
+\newcommand{\N}{\mathbb{N}}
+\renewcommand{\O}{\mathcal{O}}
+\renewcommand{\P}{\mathbb{P}}
+\newcommand{\Q}{\mathbb{Q}}
+\newcommand{\R}{\mathbb{R}}
+\renewcommand{\S}{\mathbb{S}}
+\newcommand{\Z}{\mathbb{Z}}
+% math operators
+\DeclareMathOperator{\Cov}{Cov}
+\DeclareMathOperator{\Var}{Var}
+\let\Re\relax
+\DeclareMathOperator{\Re}{Re}
+\let\Im\relax
+\DeclareMathOperator{\Im}{Im}
+\DeclareMathOperator{\diag}{diag}
+\DeclareMathOperator{\tr}{tr}
+\DeclareMathOperator*{\argmax}{arg\,max}
+\DeclareMathOperator*{\argmin}{arg\,min}
+% misc
+\newcommand{\mat}[1]{\begin{bmatrix}#1\end{bmatrix}}
+\newcommand{\ind}[1]{\mathds{1}_{#1}}
+\renewcommand{\epsilon}{\varepsilon}
+
+\title[Footer Title]{Parallel Fast Multipole}
+\institute[]{NYU Courant}
+\author{Paul Beckman, Mariya Savinov}
+\date{\today}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+\end{frame}
+
+% Uncomment these lines for an automatically generated outline.
+%\begin{frame}{Outline}
+%  \tableofcontents
+%\end{frame}
+
+\begin{frame}{Motivating Problem}
+  \pause
+  \begin{itemize}
+  \item Consider a collection of interacting particles with a potential
+  \pause
+  \item \textbf{Total potential} at a point $x$ due to \textbf{particles} $x_j$ with \textbf{charges} $q_j$ is
+  \[
+  u(x) = \sum_{j=1}^n \dfrac{q_j}{\abs{x-x_j}} = \sum_{j=1}^n q_j \phi(x-x_j)
+  \]
+  \pause
+  \item Separate sum into \textbf{near-field} and \textbf{far-field} contributions
+  \begin{itemize}
+    \item Take \emph{aggregate} effect of far-field charges
+  \end{itemize}
+  \end{itemize}
+    \begin{figure}
+    \begin{center}
+    \includegraphics[width=0.85\textwidth, angle=0]{{far_field_image}.pdf}
+    \end{center}
+    %\caption{S}
+    \label{fig:far_field_approx}
+    \end{figure}
+\end{frame}
+
+\begin{frame}{Approximating far-field}
+  \pause
+  \begin{itemize}
+  \item Use \textbf{Taylor series expansion} of $\phi(x-x_j)$ for small $\delta = \dfrac{x_j-x^*}{x^*-x}$:
+  \begin{align*}
+  \phi(x_j-x) & = \phi\pr{(x^*-x)\pr{1+\delta}}= \phi(x^*-x)\phi(1+\delta)\\
+  & \approx \phi(x^*-x)\br{\sum_{k=0}^p \dfrac{\phi^{(k)}(1)}{k!}\delta^k + O(\delta^{p+1})}\\
+  & = \sum_{k=0}^p a_k(x_j-x^*)S_k(x^*-x) + O(\delta^{p+1})
+  \end{align*}
+  %$a_k(x_j-x^*) = \dfrac{\phi^{(k)}(1)}{k!}(x_j-x^*)^k$\quad and\quad $S_k(x^*-x)=\dfrac{\phi(x^*-x)}{(x^*-x)^k}$
+  \pause
+  \item Then potential from $x_j\in\text{far-field}$ is
+  \[
+  \sum_{j\in\text{far-field}} q_j\phi(x-x_j) \approx \sum_{k=0}^p \br{\sum_{j\in\text{far-field}} q_j a_k(x_j-x^*)} S_k(x^*-x)+ O(\delta^{p+1})
+  \]
+  \pause
+  \item Accuracy depends on choice of $x^*$ and thus size of  $\delta = \dfrac{x_j-x^*}{x^*-x}$
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Tree Algorithm by Barnes and Hut, complexity $O(N\log N)$}
+  \pause
+  \begin{itemize}
+    \item For $N$ particles, partition $[0,1]$ uniformly at $O(\log N)$ levels:
+    
+  \begin{figure}
+  \begin{center}
+  \includegraphics[width=0.65\textwidth, angle=0]{{binary_tree_FMM}.png}
+  \end{center}
+  %\caption{S}
+  \label{fig:binary_tree}
+  \end{figure}
+  
+    \pause
+    \item Let $T_{\ell, m}$ be the cell at level $\ell$ with index $m=1:2^{\ell}$ with center $x_{\ell,m}^*$.
+    \pause
+    \item Compute weight at each cell, total cost $O(N\log N)$
+    \[
+    w_{\ell, m, k} = \sum_{x_j \in T_{\ell,m}} q_j a_k(x_j-x_{\ell,m}^*)
+    \]
+    \pause
+    \item For a point $x$: far-field components added at increasingly \emph{coarse} levels
+    \[
+    u(x) = \sum_{\ell=1}^{O(\log N)}\sum_{k=0}^p w_{\ell,m(\ell),k} S_k\pr{x_{\ell, m(\ell)}^* - x}
+    \]
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Interaction List}
+  \pause
+  \begin{itemize}
+  \item At each level, only 'interact' with up to 4 far-field cells \emph{not already included at higher levels}
+  \pause
+  \begin{figure}
+  \begin{center}
+  \includegraphics[width=0.65\textwidth, angle=0]{{interaction_list}.pdf}
+  \end{center}
+  %\caption{S}
+  \label{fig:interaction_list}
+  \end{figure}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Parallelism}
+    \pause
+    \begin{itemize}
+        \item Parallelize with OpenMP
+        \pause
+        \begin{itemize}
+            \item \emph{Challenge:}  \pause Recursive tree code may prevent significant speedup
+        \end{itemize}
+        \pause
+        \item Partition the memory and work with MPI
+        \pause
+        \begin{itemize}
+            \item \emph{Challenge:} \pause Minimizing communication between cores
+        \end{itemize}
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Results}
+    \pause
+    \begin{itemize}
+        \item Speed-up
+        \pause
+        \item How we measured speed-up
+        \pause
+        \item What did we expect? Is there some unavoidable overhead?
+    \end{itemize}
+\end{frame}
+
+
+\end{document}
