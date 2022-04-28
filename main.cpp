@@ -60,7 +60,6 @@ Node* build_tree(
         tree->x + nleft, tree->q + nleft, tree->I + nleft, nright, 
         max_pts, (a+b)/2, b, p, tree
         );
-      
     }
   }
   return tree;
@@ -87,96 +86,121 @@ void compute_weights(Node* tree) {
   }
 }
 
-Node* get_interaction(Node* tree, bool left) {
-  // all the comments here are assuming left = 1
-  // switch right and left in the comments for the case left = 0
-  Node* node = tree->parent; // initialize node pointer we'll search tree with
-  int l = 1; // how many levels have we moved up in our search
-  printf("search cell center is %.4f, l = %i\n", node->c, l);
-  
-  // ascend the tree until we are not the left child of our parent
-  while (
-    node->parent && (left ? node->parent->left : node->parent->right) == node
-    ) { 
-    node = node->parent;
-    l++;
-    printf("ascending cell center is %.4f, l = %i\n", node->c, l);
-  }
-
-  if (node->parent) {
-    // now we're the right child of our parent
-    // so we cross the tree to be in the left branch
-    node = left ? node->parent->left : node->parent->right;
-    printf("going opposite branch cell center is %.4f, l = %i\n", node->c, l);
-
-    // descend the tree to the right until we are one level above the base node
-    for (; l > 1; l--) {
-      node = left ? node->right : node->left;
-      printf("descending cell center is %.4f, l = %i\n", node->c, l);
-    }
-
-    // if the base node was originally a left node, the right child here
-    // is in the near field, so give only the left child
-    if ((left ? tree->parent->left : tree->parent->right) == tree) {
-      if (left ? node->left : node->right) {
-        node = left ? node->left : node->right;
-        l--;
-      } else {
-        // we can't go down to the correct level to get out of the near-field
-        // so we have no left interactions
-        return nullptr;
+void add_near_field(double* u, Node* source, Node* target) {
+  // evaluate near-field directly
+  for (int i = 0; i < target->n; i++) {
+    for (int j = 0; j < source->n; j++) {
+      if (std::abs(target->x[i] - source->x[j]) > 1e-16) {
+        // add exact potential q_i / |x[i] - x[j]|
+        printf("u[%i]: %.3f ", target->I[i], u[target->I[i]]);
+        u[target->I[i]] += source->q[j] / std::abs(target->x[i] - source->x[j]);
+        printf(
+          "-> %.3f (q[%i] = %.3f, x[%i] = %.3f, x[%i] = %.3f)\n", 
+          u[target->I[i]], j, source->q[j], i, target->x[i], j, source->x[j]
+          );
       }
     }
-
-    return node;
-  } else { 
-    // we're at the root node, which means we're the leftmost cell
-    // at this level, so we have no left interactions
-    return nullptr;
   }
-  
 }
 
-void add_far_field(double* u, Node* tree, Node* node) {
+void add_far_field(double* u, Node* source, Node* target) {
   // evaluate far-field using multipole expansions
-  for (int i = 0; i < tree->n; i++) {
-    for (int m = 0; m < tree->p; m++) {
+  for (int i = 0; i < target->n; i++) {
+    for (int m = 0; m < target->p; m++) {
       // add approximate potential term w_{i,m} * S_m(c - x[i]) 
       // where S_m(c - x[i]) = 1 / (|c - x[i]|*(c - x[i])^m)
-      printf("u[%i]: %.3f ", tree->I[i], u[tree->I[i]]);
-      u[tree->I[i]] += node->w[m] / (
-        std::abs(node->c - node->x[i])*std::pow(node->c - node->x[i], m)
+      printf("u[%i]: %.3f ", target->I[i], u[target->I[i]]);
+      u[target->I[i]] += target->w[m] / (
+        std::abs(target->c - target->x[i])*std::pow(target->c - target->x[i], m)
         );
       printf(
         "-> %.3f (w[%i] = %.3f, x[%i] = %.3f, c = %.3f)\n", 
-        u[tree->I[i]], m, node->w[m], i, node->x[i], node->c
+        u[target->I[i]], m, target->w[m], i, target->x[i], target->c
         );
     }
   }
 }
 
-void compute_potential(double* u, Node* tree) {
-  // the top two levels have empty interaction lists
-  if (tree->parent && tree->parent->parent) { 
-    Node* node = NULL;
-    
-    printf("computing left interaction for cell with center %.4f\n", tree->c);
-    node = get_interaction(tree, 1);
-    if (node) {
-      printf("left interaction cell center is %.4f\n\n", node->c);
-    } else {
-      printf("no left interaction\n\n");
-    }
-    if (node) add_far_field(u, tree, node);
+void add_interaction(double* u, Node* target, bool left) {
+  // all the comments here are assuming left = 1
+  // switch right and left in the comments for the case left = 0
+  bool leaf = !(left ? target->left : target->right); // assumes some symmetry
 
-    printf("computing right interaction for cell with center %.4f\n", tree->c);
-    node = get_interaction(tree, 0);
-    if (node) {
-      printf("right interaction cell center is %.4f\n\n", node->c);
-    } else {
-      printf("no right interaction\n\n");
+  // add left near-field terms if we're on the lowest level
+  if (leaf) {
+    if ((left ? target->parent->right : target->parent->left) == target) {
+      printf(
+        "adding near-field terms for source %.4f and target %.4f\n", 
+        (left ? target->parent->left : target->parent->right)->c, target->c
+      );
+      add_near_field(
+        u, left ? target->parent->left : target->parent->right, target
+        );
     }
-    if (node) add_far_field(u, tree, node);
+  }
+
+  Node* source = target->parent; // initialize pointer we'll search tree with
+  int l = 1; // how many levels have we moved up in our search
+  printf("search cell center is %.4f, l = %i\n", source->c, l);
+
+  // ascend the tree until we are not the left child of our parent
+  while (
+    source->parent && 
+    (left ? source->parent->left : source->parent->right) == source
+    ) { 
+    source = source->parent;
+    l++;
+    printf("ascending cell center is %.4f, l = %i\n", source->c, l);
+  }
+
+  if (source->parent) {
+    // now we're the right child of our parent
+    // so we cross the tree to be in the left branch
+    source = left ? source->parent->left : source->parent->right;
+    printf("going opposite branch cell center is %.4f, l = %i\n", source->c, l);
+
+    // descend the tree to the right until we are one level above the base node
+    for (; l > 1; l--) {
+      source = left ? source->right : source->left;
+      printf("descending cell center is %.4f, l = %i\n", source->c, l);
+    }
+
+    // add left child interaction as it will always be in the interaction list
+    printf(
+        "adding far-field terms for source %.4f and target %.4f\n", 
+        (left ? source->left : source->right)->c, target->c
+      );
+    add_far_field(u, left ? source->left : source->right, target);
+
+    // if the base node was originally a right node, both children here are
+    // in the interaction list, so add the right child interaction also
+    if ((left ? target->parent->right : target->parent->left) == target) {
+      printf(
+        "adding far-field terms for source %.4f and target %.4f\n", 
+        (left ? source->right : source->left)->c, target->c
+      );
+      add_far_field(u, left ? source->right : source->left, target);
+    } else if (leaf) {
+      // we're on the lowest level and right child is in the near field 
+      // so add it directly
+      printf(
+        "adding near-field terms for source %.4f and target %.4f\n", 
+        (left ? source->right : source->left)->c, target->c
+      );
+      add_near_field(u, left ? source->right : source->left, target);
+    }
+  }
+  printf("\n");
+}
+
+void compute_potential(double* u, Node* tree) {
+  // the top levels has no near field or interaction list
+  if (tree->parent) {     
+    printf("adding left interaction for cell with center %.4f\n", tree->c);
+    add_interaction(u, tree, 1);
+
+    printf("adding right interaction for cell with center %.4f\n", tree->c);
+    add_interaction(u, tree, 0);
   }
 
   // traverse the tree
@@ -185,16 +209,8 @@ void compute_potential(double* u, Node* tree) {
     compute_potential(u, tree->left); 
     compute_potential(u, tree->right);
   } else {
-    printf("adding near-field terms for cell with center %.4f\n\n", tree->c);
-    // evaluate near-field directly
-    for (int i = 0; i < tree->n; i++) {
-      for (int j = 0; j < tree->n; j++) {
-        if (i != j) {
-          // add exact potential q_i / |x[i] - x[j]|
-          u[tree->I[i]] += tree->q[i] / std::abs(tree->x[i] - tree->x[j]);
-        }
-      }
-    }
+    printf("adding same-cell terms for cell with center %.4f\n", tree->c);
+    add_near_field(u, tree, tree);
   }
 }
 
@@ -220,12 +236,12 @@ int main(int argc, char** argv) {
 
   // draw and sort a set of n uniform random points in [0,1]
   double* x = (double*) malloc(n * sizeof(double));
-  for (int i = 0; i < n; i++) x[i] =  ((double)i)/n + 1e-3; // ((double)rand()/RAND_MAX);
+  for (int i = 0; i < n; i++) x[i] =  ((double)i)/n + 1e-2; // ((double)rand()/RAND_MAX);
   std::sort(x, x+n);
 
   // draw a set of n uniform random charges in [-1, 1]
   double* q = (double*) malloc(n * sizeof(double));
-  for (int i = 0; i < n; i++) q[i] = 2*((double)rand()/RAND_MAX) - 1;
+  for (int i = 0; i < n; i++) q[i] = 1; // 2*((double)rand()/RAND_MAX) - 1;
 
   // make a simple index vector [0,...,n]
   int* I = (int*) malloc(n * sizeof(int));
