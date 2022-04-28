@@ -110,18 +110,18 @@ void add_far_field(double* u, Node* source, Node* target) {
       // add approximate potential term w_{i,m} * S_m(c - x[i]) 
       // where S_m(c - x[i]) = 1 / (|c - x[i]|*(c - x[i])^m)
       printf("u[%i]: %.3f ", target->I[i], u[target->I[i]]);
-      u[target->I[i]] += target->w[m] / (
-        std::abs(target->c - target->x[i])*std::pow(target->c - target->x[i], m)
+      u[target->I[i]] += source->w[m] / (
+        std::abs(source->c - target->x[i])*std::pow(source->c - target->x[i], m)
         );
       printf(
         "-> %.3f (w[%i] = %.3f, x[%i] = %.3f, c = %.3f)\n", 
-        u[target->I[i]], m, target->w[m], i, target->x[i], target->c
+        u[target->I[i]], m, source->w[m], i, target->x[i], source->c
         );
     }
   }
 }
 
-void add_interaction(double* u, Node* target, bool left) {
+void add_potential(double* u, Node* target, bool left) {
   // all the comments here are assuming left = 1
   // switch right and left in the comments for the case left = 0
   bool leaf = !(left ? target->left : target->right); // assumes some symmetry
@@ -167,7 +167,7 @@ void add_interaction(double* u, Node* target, bool left) {
 
     // add left child interaction as it will always be in the interaction list
     printf(
-        "adding far-field terms for source %.4f and target %.4f\n", 
+        "adding interaction list terms for source %.4f and target %.4f\n", 
         (left ? source->left : source->right)->c, target->c
       );
     add_far_field(u, left ? source->left : source->right, target);
@@ -176,7 +176,7 @@ void add_interaction(double* u, Node* target, bool left) {
     // in the interaction list, so add the right child interaction also
     if ((left ? target->parent->right : target->parent->left) == target) {
       printf(
-        "adding far-field terms for source %.4f and target %.4f\n", 
+        "adding interaction list terms for source %.4f and target %.4f\n", 
         (left ? source->right : source->left)->c, target->c
       );
       add_far_field(u, left ? source->right : source->left, target);
@@ -194,13 +194,13 @@ void add_interaction(double* u, Node* target, bool left) {
 }
 
 void compute_potential(double* u, Node* tree) {
-  // the top levels has no near field or interaction list
+  // the top level has no near field or interaction list
   if (tree->parent) {     
     printf("adding left interaction for cell with center %.4f\n", tree->c);
-    add_interaction(u, tree, 1);
+    add_potential(u, tree, 1);
 
     printf("adding right interaction for cell with center %.4f\n", tree->c);
-    add_interaction(u, tree, 0);
+    add_potential(u, tree, 0);
   }
 
   // traverse the tree
@@ -215,10 +215,6 @@ void compute_potential(double* u, Node* tree) {
 }
 
 void barnes_hut(double* u, int n, Node* tree, int p) {
-  // allocate temporary vectors to store source and target points during the computation
-  double* sources = (double*) malloc(n * sizeof(double));
-  double* targets = (double*) malloc(n * sizeof(double));
-
   // compute the weights and store them in the tree
   compute_weights(tree);
 
@@ -241,7 +237,7 @@ int main(int argc, char** argv) {
 
   // draw a set of n uniform random charges in [-1, 1]
   double* q = (double*) malloc(n * sizeof(double));
-  for (int i = 0; i < n; i++) q[i] = 1; // 2*((double)rand()/RAND_MAX) - 1;
+  for (int i = 0; i < n; i++) q[i] = 2*((double)rand()/RAND_MAX) - 1;
 
   // make a simple index vector [0,...,n]
   int* I = (int*) malloc(n * sizeof(int));
@@ -259,6 +255,7 @@ int main(int argc, char** argv) {
   barnes_hut(u, n, tree, p);
 
   // display potential at source / target points
+  printf("\nPotential:\n");
   for (int i = 0; i < n; i++) printf("u(%.3f) = %.3f\n", x[i], u[i]);
 
   free(x);
