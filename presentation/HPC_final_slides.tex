@@ -104,14 +104,14 @@
   \item Use \textbf{Taylor series expansion} of $\phi(x-x_j)$ for small $\delta = \dfrac{x_j-x^*}{x^*-x}$:
   \begin{align*}
   \phi(x_j-x) & = \phi\pr{(x^*-x)\pr{1+\delta}}= \phi(x^*-x)\phi(1+\delta)\\
-  & \approx \phi(x^*-x)\br{\sum_{k=0}^p \dfrac{\phi^{(k)}(1)}{k!}\delta^k + O(\delta^{p+1})}\\
-  & = \sum_{k=0}^p a_k(x_j-x^*)S_k(x^*-x) + O(\delta^{p+1})
+  & \approx \phi(x^*-x)\br{\sum_{m=0}^p \dfrac{\phi^{(m)}(1)}{m!}\delta^m + O(\delta^{p+1})}\\
+  & = \sum_{m=0}^p a_m(x_j-x^*)S_m(x^*-x) + O(\delta^{p+1})
   \end{align*}
   %$a_k(x_j-x^*) = \dfrac{\phi^{(k)}(1)}{k!}(x_j-x^*)^k$\quad and\quad $S_k(x^*-x)=\dfrac{\phi(x^*-x)}{(x^*-x)^k}$
   \pause
   \item Then potential from $x_j\in\text{far-field}$ is
   \[
-  \sum_{j\in\text{far-field}} q_j\phi(x-x_j) \approx \sum_{k=0}^p \br{\sum_{j\in\text{far-field}} q_j a_k(x_j-x^*)} S_k(x^*-x)+ O(\delta^{p+1})
+  \sum_{j\in\text{far-field}} q_j\phi(x-x_j) \approx \sum_{m=0}^p \br{\sum_{j\in\text{far-field}} q_j a_m(x_j-x^*)} S_m(x^*-x)+ O(\delta^{p+1})
   \]
   \pause
   \item Accuracy depends on choice of $x^*$ and thus size of  $\delta = \dfrac{x_j-x^*}{x^*-x}$
@@ -122,7 +122,7 @@
   \pause
   \begin{itemize}
     \item For $N$ particles, partition $[0,1]$ uniformly at $O(\log N)$ levels:
-    
+
   \begin{figure}
   \begin{center}
   \includegraphics[width=0.65\textwidth, angle=0]{{binary_tree_FMM}.png}
@@ -130,18 +130,18 @@
   %\caption{S}
   \label{fig:binary_tree}
   \end{figure}
-  
+
     \pause
-    \item Let $T_{\ell, m}$ be the cell at level $\ell$ with index $m=1:2^{\ell}$ with center $x_{\ell,m}^*$.
+    \item Let $T_{\ell, k}$ be the cell at level $\ell$ with index $k=1:2^{\ell}$ with center $x_{\ell,k}^*$.
     \pause
     \item Compute weight at each cell, total cost $O(N\log N)$
     \[
-    w_{\ell, m, k} = \sum_{x_j \in T_{\ell,m}} q_j a_k(x_j-x_{\ell,m}^*)
+    w_{\ell, k, m} = \sum_{x_j \in T_{\ell,k}} q_j a_m(x_j-x_{\ell,k}^*)
     \]
     \pause
     \item For a point $x$: far-field components added at increasingly \emph{coarse} levels
     \[
-    u(x) = \sum_{\ell=1}^{O(\log N)}\sum_{k=0}^p w_{\ell,m(\ell),k} S_k\pr{x_{\ell, m(\ell)}^* - x}
+    u(x) = \sum_{\ell=1}^{O(\log N)}\sum_{m=0}^p w_{\ell,k(\ell),m} S_m\pr{x_{\ell, k(\ell)}^* - x}
     \]
   \end{itemize}
 \end{frame}
@@ -149,7 +149,7 @@
 \begin{frame}{Interaction List}
   \pause
   \begin{itemize}
-  \item At each level, only 'interact' with up to 4 far-field cells \emph{not already included at higher levels}
+  \item At each level, only 'interact' with up to 3 far-field cells \emph{not already included at higher levels}
   \pause
   \begin{figure}
   \begin{center}
