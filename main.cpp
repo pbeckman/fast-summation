@@ -267,7 +267,7 @@ int main(int argc, char** argv) {
 
   // draw a set of n uniform random charges in [-1, 1]
   double* q = (double*) malloc(n * sizeof(double));
-  for (int i = 0; i < n; i++) q[i] = 1;//2*((double)rand()/RAND_MAX) - 1;
+  for (int i = 0; i < n; i++) q[i] = 2*((double)rand()/RAND_MAX) - 1;
 
   // make a simple index vector [0,...,n]
   int* I = (int*) malloc(n * sizeof(int));
