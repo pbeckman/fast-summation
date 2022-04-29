@@ -85,7 +85,7 @@ void compute_weights(Node* tree) {
 
 	// POTENTIAL PROBLEM: May lead to a race condition
 
-	#pragma omp parallel num_threads (THREADNUM)
+	#pragma omp parallel num_threads (THREADNUM) if(tree->n > 50 && tree->p > 4)
 	{
 	#pragma omp for
 	for (int i = 0; i < tree->n; i++) {
@@ -112,7 +112,7 @@ void compute_weights(Node* tree) {
 void add_near_field(double* u, Node* source, Node* target) {
   // evaluate near-field directly
 	
-	#pragma omp parallel num_threads(THREADNUM)
+	#pragma omp parallel num_threads(THREADNUM) 
 	{
 	#pragma omp for
   for (int i = 0; i < target->n; i++) {
@@ -135,7 +135,7 @@ void add_near_field(double* u, Node* source, Node* target) {
 void add_far_field(double* u, Node* source, Node* target) {
   // evaluate far-field using multipole expansions
 
-	#pragma omp parallel num_threads(THREADNUM)
+	#pragma omp parallel num_threads(THREADNUM) if(target->n > 50 && target->p > 4)
 	{
 	#pragma omp for schedule(dynamic)
   for (int i = 0; i < target->n; i++) {
