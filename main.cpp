@@ -9,7 +9,7 @@
 #include <iostream>
 #include "utils.h"
 
-#define VERB 1
+#define VERB 0
 #define THREADNUM 8
 
 struct Node {
@@ -83,7 +83,7 @@ Node* build_tree(
 
 void compute_weights(Node* tree) {
 
-	// I think this could lead to a race condition, but I am not sure?
+	// doubles computation time (BAD)
 
 	#pragma omp parallel num_threads (THREADNUM)
 	{
@@ -112,6 +112,9 @@ void compute_weights(Node* tree) {
 void add_near_field(double* u, Node* source, Node* target) {
   // evaluate near-field directly
 
+	// increases runtime by factor of ~2.5 (BAD)
+	
+	
 	#pragma omp parallel num_threads(THREADNUM)
 	{
 	#pragma omp for
@@ -135,6 +138,8 @@ void add_near_field(double* u, Node* source, Node* target) {
 void add_far_field(double* u, Node* source, Node* target) {
   // evaluate far-field using multipole expansions
 
+	// slightly worse run-time
+	
 	#pragma omp parallel num_threads(THREADNUM)
 	{
 	#pragma omp for schedule(dynamic)
@@ -142,8 +147,13 @@ void add_far_field(double* u, Node* source, Node* target) {
     for (int m = 0; m < target->p; m++) {
       // add approximate potential term w_{i,m} * S_m(c - x[i]) 
       // where S_m(c - x[i]) = 1 / (|c - x[i]|*(c - x[i])^m)
-      u[target->I[i]] +=  source->w[m] / (
+      if (VERB) printf("u[%i]: %.3f ", target->I[i], u[target->I[i]]);
+      u[target->I[i]] += source->w[m] / (
         std::abs(source->c - target->x[i])*std::pow(source->c - target->x[i], m)
+        );
+      if (VERB) printf(
+        "-> %.3f (w[%i] = %.3f, x[%i] = %.3f, c = %.3f)\n", 
+        u[target->I[i]], m, source->w[m], i, target->x[i], source->c
         );
     }
   } 
