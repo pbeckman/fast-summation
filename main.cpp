@@ -1,9 +1,16 @@
+// g++ -std=c++11 -O3 -march=native main.cpp -o main
+// g++ -std=c++11 -O3 -march=native -fopenmp main.cpp -o main
 #include <algorithm>
 #include <stdio.h>
 #include <math.h>
+#ifdef _OPENMP
 #include <omp.h>
+#endif
 #include <iostream>
 #include "utils.h"
+
+#define VERB 1
+#define THREADNUM 8
 
 struct Node {
   double* x = NULL;  // array of points
@@ -75,18 +82,25 @@ Node* build_tree(
 }
 
 void compute_weights(Node* tree) {
-  for (int i = 0; i < tree->n; i++) {
+
+	// I think this could lead to a race condition, but I am not sure?
+
+	#pragma omp parallel num_threads (THREADNUM)
+	{
+	#pragma omp for
+	for (int i = 0; i < tree->n; i++) {
     for (int m = 0; m < tree->p; m++) {
       // add weight term q_i a_m(x[i] - c) 
       // where a_m(x[i] - c) = (c - x[i])^m
-      printf("w[%i]: %.3f ", m, tree->w[m]);
+      if (VERB)  printf("w[%i]: %.3f ", m, tree->w[m]);
       tree->w[m] += tree->q[i] * std::pow((tree->c - tree->x[i]), m);
-      printf(
+      if (VERB)  printf(
         "-> %.3f (q[%i] = %.3f, x[%i] = %.3f, c = %.3f)\n", 
         tree->w[m], i, tree->q[i], i, tree->x[i], tree->c
         );
     }
   }
+	}
 
   // traverse the tree
   if (tree->left) {
@@ -97,37 +111,44 @@ void compute_weights(Node* tree) {
 
 void add_near_field(double* u, Node* source, Node* target) {
   // evaluate near-field directly
+
+	#pragma omp parallel num_threads(THREADNUM)
+	{
+	#pragma omp for
   for (int i = 0; i < target->n; i++) {
     for (int j = 0; j < source->n; j++) {
       if (std::abs(target->x[i] - source->x[j]) > 1e-16) {
         // add exact potential q_i / |x[i] - x[j]|
-        printf("u[%i]: %.3f ", target->I[i], u[target->I[i]]);
+        if (VERB) printf("u[%i]: %.3f ", target->I[i], u[target->I[i]]);
         u[target->I[i]] += source->q[j] / std::abs(target->x[i] - source->x[j]);
-        printf(
+        if (VERB) printf(
           "-> %.3f (q[%i] = %.3f, x[%i] = %.3f, x[%i] = %.3f)\n", 
           u[target->I[i]], j, source->q[j], i, target->x[i], j, source->x[j]
           );
       }
     }
-  }
+  } 
+	} 
+	
 }
 
 void add_far_field(double* u, Node* source, Node* target) {
   // evaluate far-field using multipole expansions
+
+	#pragma omp parallel num_threads(THREADNUM)
+	{
+	#pragma omp for schedule(dynamic)
   for (int i = 0; i < target->n; i++) {
     for (int m = 0; m < target->p; m++) {
       // add approximate potential term w_{i,m} * S_m(c - x[i]) 
       // where S_m(c - x[i]) = 1 / (|c - x[i]|*(c - x[i])^m)
-      printf("u[%i]: %.3f ", target->I[i], u[target->I[i]]);
-      u[target->I[i]] += source->w[m] / (
+      u[target->I[i]] +=  source->w[m] / (
         std::abs(source->c - target->x[i])*std::pow(source->c - target->x[i], m)
         );
-      printf(
-        "-> %.3f (w[%i] = %.3f, x[%i] = %.3f, c = %.3f)\n", 
-        u[target->I[i]], m, source->w[m], i, target->x[i], source->c
-        );
     }
-  }
+  } 
+	} 
+ 	
 }
 
 void add_potential(double* u, Node* target, bool left) {
@@ -138,7 +159,7 @@ void add_potential(double* u, Node* target, bool left) {
   // add left near-field terms if we're on the lowest level
   if (leaf) {
     if ((left ? target->parent->right : target->parent->left) == target) {
-      printf(
+      if (VERB) printf(
         "adding near-field terms for source %.4f and target %.4f\n", 
         (left ? target->parent->left : target->parent->right)->c, target->c
       );
@@ -150,7 +171,7 @@ void add_potential(double* u, Node* target, bool left) {
 
   Node* source = target->parent; // initialize pointer we'll search tree with
   int l = 1; // how many levels have we moved up in our search
-  printf("search cell center is %.4f, l = %i\n", source->c, l);
+  if (VERB) printf("search cell center is %.4f, l = %i\n", source->c, l);
 
   // ascend the tree until we are not the left child of our parent
   while (
@@ -159,23 +180,23 @@ void add_potential(double* u, Node* target, bool left) {
     ) { 
     source = source->parent;
     l++;
-    printf("ascending cell center is %.4f, l = %i\n", source->c, l);
+    if (VERB) printf("ascending cell center is %.4f, l = %i\n", source->c, l);
   }
 
   if (source->parent) {
     // now we're the right child of our parent
     // so we cross the tree to be in the left branch
     source = left ? source->parent->left : source->parent->right;
-    printf("going opposite branch cell center is %.4f, l = %i\n", source->c, l);
+    if (VERB) printf("going opposite branch cell center is %.4f, l = %i\n", source->c, l);
 
     // descend the tree to the right until we are one level above the base node
     for (; l > 1; l--) {
       source = left ? source->right : source->left;
-      printf("descending cell center is %.4f, l = %i\n", source->c, l);
+      if (VERB) printf("descending cell center is %.4f, l = %i\n", source->c, l);
     }
 
     // add left child interaction as it will always be in the interaction list
-    printf(
+    if (VERB) printf(
         "adding interaction list terms for source %.4f and target %.4f\n", 
         (left ? source->left : source->right)->c, target->c
       );
@@ -184,7 +205,7 @@ void add_potential(double* u, Node* target, bool left) {
     // if the base node was originally a right node, both children here are
     // in the interaction list, so add the right child interaction also
     if ((left ? target->parent->right : target->parent->left) == target) {
-      printf(
+      if (VERB) printf(
         "adding interaction list terms for source %.4f and target %.4f\n", 
         (left ? source->right : source->left)->c, target->c
       );
@@ -192,23 +213,23 @@ void add_potential(double* u, Node* target, bool left) {
     } else if (leaf) {
       // we're on the lowest level and right child is in the near field 
       // so add it directly
-      printf(
+      if (VERB) printf(
         "adding near-field terms for source %.4f and target %.4f\n", 
         (left ? source->right : source->left)->c, target->c
       );
       add_near_field(u, left ? source->right : source->left, target);
     }
   }
-  printf("\n");
+  if (VERB) printf("\n");
 }
 
 void compute_potential(double* u, Node* tree) {
   // the top level has no near field or interaction list
   if (tree->parent) {     
-    printf("adding left interaction for cell with center %.4f\n", tree->c);
+    if (VERB) printf("adding left interaction for cell with center %.4f\n", tree->c);
     add_potential(u, tree, 1);
 
-    printf("adding right interaction for cell with center %.4f\n", tree->c);
+    if (VERB) printf("adding right interaction for cell with center %.4f\n", tree->c);
     add_potential(u, tree, 0);
   }
 
@@ -218,7 +239,7 @@ void compute_potential(double* u, Node* tree) {
     compute_potential(u, tree->left); 
     compute_potential(u, tree->right);
   } else {
-    printf("adding same-cell terms for cell with center %.4f\n", tree->c);
+    if (VERB) printf("adding same-cell terms for cell with center %.4f\n", tree->c);
     add_near_field(u, tree, tree);
   }
 }
@@ -246,7 +267,7 @@ int main(int argc, char** argv) {
 
   // draw a set of n uniform random charges in [-1, 1]
   double* q = (double*) malloc(n * sizeof(double));
-  for (int i = 0; i < n; i++) q[i] = 2*((double)rand()/RAND_MAX) - 1;
+  for (int i = 0; i < n; i++) q[i] = 1;//2*((double)rand()/RAND_MAX) - 1;
 
   // make a simple index vector [0,...,n]
   int* I = (int*) malloc(n * sizeof(int));
@@ -261,11 +282,21 @@ int main(int argc, char** argv) {
   for (int i = 0; i < n; i++) u[i] = 0;
 
   // run barnes_hut
-  barnes_hut(u, n, tree, p);
+	//double tt = omp_get_wtime();  // time it
+	Timer tt;
+	tt.tic();
+	barnes_hut(u, n, tree, p);
+	double runtime = tt.toc();
+	//tt = omp_get_wtime() - tt;
+
 
   // display potential at source / target points
+	if (VERB) {
   printf("\nPotential:\n");
   for (int i = 0; i < n; i++) printf("u(%.3f) = %.3f\n", x[i], u[i]);
+	}
+
+	printf("\nRuntime: %f s\n\n",runtime);
 
   free(x);
   free(q);
