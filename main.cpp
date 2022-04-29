@@ -83,7 +83,7 @@ Node* build_tree(
 
 void compute_weights(Node* tree) {
 
-	// doubles computation time (BAD)
+	// POTENTIAL PROBLEM: May lead to a race condition
 
 	#pragma omp parallel num_threads (THREADNUM)
 	{
@@ -111,9 +111,6 @@ void compute_weights(Node* tree) {
 
 void add_near_field(double* u, Node* source, Node* target) {
   // evaluate near-field directly
-
-	// increases runtime by factor of ~2.5 (BAD)
-	
 	
 	#pragma omp parallel num_threads(THREADNUM)
 	{
@@ -138,8 +135,6 @@ void add_near_field(double* u, Node* source, Node* target) {
 void add_far_field(double* u, Node* source, Node* target) {
   // evaluate far-field using multipole expansions
 
-	// slightly worse run-time
-	
 	#pragma omp parallel num_threads(THREADNUM)
 	{
 	#pragma omp for schedule(dynamic)
