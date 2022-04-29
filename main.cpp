@@ -241,7 +241,7 @@ int main(int argc, char** argv) {
 
   // draw and sort a set of n uniform random points in [0,1]
   double* x = (double*) malloc(n * sizeof(double));
-  for (int i = 0; i < n; i++) x[i] = ((double) i)/n + 1e-2; // ((double)rand()/RAND_MAX);
+  for (int i = 0; i < n; i++) x[i] = ((double) i)/n; // ((double)rand()/RAND_MAX);
   std::sort(x, x+n);
 
   // draw a set of n uniform random charges in [-1, 1]
