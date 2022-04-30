@@ -10,7 +10,7 @@
 #include "utils.h"
 
 #define VERB 0
-#define THREADNUM 5
+#define THREADNUM 8
 #define PVER 2
 
 struct Node {
@@ -240,7 +240,7 @@ void compute_potential(double* u, Node* tree) {
   // traverse the tree
   if (tree->left) {
     // continue computing far-field terms by expansion
-		#pragma omp parallel num_threads(THREADNUM) if(PVER==2)//if(pver==2)
+		#pragma omp parallel num_threads(THREADNUM) if((tree->level < std::log2(THREADNUM)) && PVER==2) //if(tree->level==0 && PVER==2)
 		{
 			#pragma omp master
 			{
@@ -302,6 +302,8 @@ int main(int argc, char** argv) {
 	double* u = (double*) malloc(n * sizeof(double));
 	for (int i = 0; i < n; i++) u[i] = 0;
 
+	omp_set_nested(true);
+
 	// run barnes_hut
 	Timer tt;
 	tt.tic();
@@ -310,10 +312,10 @@ int main(int argc, char** argv) {
 
 
 	// display potential at source / target points
-	//if (VERB) {
+	if (VERB) {
 	printf("\nPotential:\n");
-	for (int i = n-5; i < n; i++) printf("u(%.3f) = %.3f\n", x[i], u[i]);
-	//}
+	for (int i = 0; i < n; i++) printf("u(%.3f) = %.3f\n", x[i], u[i]);
+	}
 
 	printf("\nn=%d, m=%d, p=%d, time=%f s\n\n", n, max_pts, p, runtime);
 
