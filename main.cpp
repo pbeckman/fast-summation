@@ -240,7 +240,7 @@ void compute_potential(double* u, Node* tree) {
   // traverse the tree
   if (tree->left) {
     // continue computing far-field terms by expansion
-		#pragma omp parallel num_threads(THREADNUM) if(tree->level==0 && PVER==2)//if(pver==2)
+		#pragma omp parallel num_threads(THREADNUM) if(PVER==2)//if(pver==2)
 		{
 			#pragma omp master
 			{
