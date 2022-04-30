@@ -11,6 +11,7 @@
 
 #define VERB 0
 #define THREADNUM 5
+#define PVER 2
 
 struct Node {
   double* x = NULL;  // array of points
@@ -83,7 +84,7 @@ Node* build_tree(
 
 void compute_weights(Node* tree) {
 
-	#pragma omp parallel num_threads (THREADNUM) //if(tree->n > 50 && tree->p > 4)
+	#pragma omp parallel num_threads(THREADNUM) if(PVER==1) //if(tree->n > 50 && tree->p > 4)
 	{
 	#pragma omp for
 	for (int m = 0; m < tree->p; m++) {
@@ -110,7 +111,7 @@ void compute_weights(Node* tree) {
 void add_near_field(double* u, Node* source, Node* target) {
   // evaluate near-field directly
 	
-	#pragma omp parallel num_threads(THREADNUM) 
+	#pragma omp parallel num_threads(THREADNUM) if(PVER==1)
 	{
 	#pragma omp for
   for (int i = 0; i < target->n; i++) {
@@ -133,7 +134,7 @@ void add_near_field(double* u, Node* source, Node* target) {
 void add_far_field(double* u, Node* source, Node* target) {
   // evaluate far-field using multipole expansions
 
-	#pragma omp parallel num_threads(THREADNUM) //if(target->n > 50 && target->p > 4)
+	#pragma omp parallel num_threads(THREADNUM) if(PVER==1) //if(target->n > 50 && target->p > 4)
 	{
 	#pragma omp for schedule(dynamic)
   for (int i = 0; i < target->n; i++) {
@@ -175,7 +176,7 @@ void add_potential(double* u, Node* target, bool left) {
   Node* source = target->parent; // initialize pointer we'll search tree with
   int l = 1; // how many levels have we moved up in our search
   if (VERB) printf("search cell center is %.4f, l = %i\n", source->c, l);
-
+ 
   // ascend the tree until we are not the left child of our parent
   while (
     source->parent && 
@@ -239,8 +240,24 @@ void compute_potential(double* u, Node* tree) {
   // traverse the tree
   if (tree->left) {
     // continue computing far-field terms by expansion
-    compute_potential(u, tree->left); 
-    compute_potential(u, tree->right);
+		#pragma omp parallel num_threads(THREADNUM) if(tree->level==0 && PVER==2)//if(pver==2)
+		{
+			#pragma omp master
+			{
+			if (VERB) printf("Entering parallel region\n");	
+			}
+			#pragma omp sections
+			{
+				#pragma omp section
+				{
+		  		compute_potential(u, tree->left); 
+				}
+				#pragma omp section
+				{
+			  compute_potential(u, tree->right);
+				}
+			}
+		}
   } else {
     if (VERB) printf("adding same-cell terms for cell with center %.4f\n", tree->c);
     add_near_field(u, tree, tree);
@@ -263,7 +280,7 @@ int main(int argc, char** argv) {
   // number of terms in multipole expansion
   int p = read_option<int>("-p", argc, argv, "1"); 
 
-
+	
 	// draw and sort a set of n uniform random points in [0,1]
 	double* x = (double*) malloc(n * sizeof(double));
 	for (int i = 0; i < n; i++) x[i] = ((double) i)/n; // ((double)rand()/RAND_MAX);
@@ -293,10 +310,10 @@ int main(int argc, char** argv) {
 
 
 	// display potential at source / target points
-	if (VERB) {
+	//if (VERB) {
 	printf("\nPotential:\n");
-	for (int i = 0; i < n; i++) printf("u(%.3f) = %.3f\n", x[i], u[i]);
-	}
+	for (int i = n-5; i < n; i++) printf("u(%.3f) = %.3f\n", x[i], u[i]);
+	//}
 
 	printf("\nn=%d, m=%d, p=%d, time=%f s\n\n", n, max_pts, p, runtime);
 
@@ -304,5 +321,6 @@ int main(int argc, char** argv) {
 	free(q);
 	free(I);
 	free(u);
+	
 	
 }
