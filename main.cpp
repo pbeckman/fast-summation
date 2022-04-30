@@ -10,7 +10,7 @@
 #include "utils.h"
 
 #define VERB 0
-#define THREADNUM 8
+#define THREADNUM 5
 
 struct Node {
   double* x = NULL;  // array of points
@@ -83,13 +83,11 @@ Node* build_tree(
 
 void compute_weights(Node* tree) {
 
-	// POTENTIAL PROBLEM: May lead to a race condition
-
-	#pragma omp parallel num_threads (THREADNUM) if(tree->n > 50 && tree->p > 4)
+	#pragma omp parallel num_threads (THREADNUM) //if(tree->n > 50 && tree->p > 4)
 	{
 	#pragma omp for
-	for (int i = 0; i < tree->n; i++) {
-    for (int m = 0; m < tree->p; m++) {
+	for (int m = 0; m < tree->p; m++) {
+    for (int i = 0; i < tree->n; i++) {
       // add weight term q_i a_m(x[i] - c) 
       // where a_m(x[i] - c) = (c - x[i])^m
       if (VERB)  printf("w[%i]: %.3f ", m, tree->w[m]);
@@ -135,7 +133,7 @@ void add_near_field(double* u, Node* source, Node* target) {
 void add_far_field(double* u, Node* source, Node* target) {
   // evaluate far-field using multipole expansions
 
-	#pragma omp parallel num_threads(THREADNUM) if(target->n > 50 && target->p > 4)
+	#pragma omp parallel num_threads(THREADNUM) //if(target->n > 50 && target->p > 4)
 	{
 	#pragma omp for schedule(dynamic)
   for (int i = 0; i < target->n; i++) {
@@ -265,46 +263,46 @@ int main(int argc, char** argv) {
   // number of terms in multipole expansion
   int p = read_option<int>("-p", argc, argv, "1"); 
 
-  // draw and sort a set of n uniform random points in [0,1]
-  double* x = (double*) malloc(n * sizeof(double));
-  for (int i = 0; i < n; i++) x[i] = ((double) i)/n; // ((double)rand()/RAND_MAX);
-  std::sort(x, x+n);
 
-  // draw a set of n uniform random charges in [-1, 1]
-  double* q = (double*) malloc(n * sizeof(double));
-  for (int i = 0; i < n; i++) q[i] = 2*((double)rand()/RAND_MAX) - 1;
+	// draw and sort a set of n uniform random points in [0,1]
+	double* x = (double*) malloc(n * sizeof(double));
+	for (int i = 0; i < n; i++) x[i] = ((double) i)/n; // ((double)rand()/RAND_MAX);
+	std::sort(x, x+n);
 
-  // make a simple index vector [0,...,n]
-  int* I = (int*) malloc(n * sizeof(int));
-  for (int i = 0; i < n; i++) I[i] = i;
+	// draw a set of n uniform random charges in [-1, 1]
+	double* q = (double*) malloc(n * sizeof(double));
+	for (int i = 0; i < n; i++) q[i] = 2*((double)rand()/RAND_MAX) - 1;
 
-  // build a binary tree subdiving our points
-  printf("p = %i\n", p);
-  Node* tree = build_tree(x, q, I, n, max_pts, 0, 1, p, 0, 0, NULL);
+	// make a simple index vector [0,...,n]
+	int* I = (int*) malloc(n * sizeof(int));
+	for (int i = 0; i < n; i++) I[i] = i;
 
-  // allocate the potential and initialize to zero
-  double* u = (double*) malloc(n * sizeof(double));
-  for (int i = 0; i < n; i++) u[i] = 0;
+	// build a binary tree subdiving our points
+	if (VERB) printf("p = %i\n", p);
+	Node* tree = build_tree(x, q, I, n, max_pts, 0, 1, p, 0, 0, NULL);
 
-  // run barnes_hut
-	//double tt = omp_get_wtime();  // time it
+	// allocate the potential and initialize to zero
+	double* u = (double*) malloc(n * sizeof(double));
+	for (int i = 0; i < n; i++) u[i] = 0;
+
+	// run barnes_hut
 	Timer tt;
 	tt.tic();
 	barnes_hut(u, n, tree, p);
 	double runtime = tt.toc();
-	//tt = omp_get_wtime() - tt;
 
 
-  // display potential at source / target points
+	// display potential at source / target points
 	if (VERB) {
-  printf("\nPotential:\n");
-  for (int i = 0; i < n; i++) printf("u(%.3f) = %.3f\n", x[i], u[i]);
+	printf("\nPotential:\n");
+	for (int i = 0; i < n; i++) printf("u(%.3f) = %.3f\n", x[i], u[i]);
 	}
 
-	printf("\nRuntime: %f s\n\n",runtime);
+	printf("\nn=%d, m=%d, p=%d, time=%f s\n\n", n, max_pts, p, runtime);
 
-  free(x);
-  free(q);
-  free(I);
-  free(u);
+	free(x);
+	free(q);
+	free(I);
+	free(u);
+	
 }
