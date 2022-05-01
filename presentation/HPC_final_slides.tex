@@ -85,6 +85,7 @@
   \]
   \pause
   \item Separate sum into \textbf{near-field} and \textbf{far-field} contributions
+  \pause
   \begin{itemize}
     \item Take \emph{aggregate} effect of far-field charges via \textbf{Taylor series expansion}
   \end{itemize}
@@ -115,7 +116,7 @@
     \label{fig:binary_tree}
     \end{figure}
     \pause
-    \item For each $T_{\ell, k}$ cell, compute weights $w_{\ell,k,m}$. \textbf{\textcolor{red}{COST?}}
+    \item For each $T_{\ell, k}$ cell, compute weights $w_{\ell,k,m}$ $\longrightarrow$ total cost $O(N\log N)$
   \end{itemize}
 \end{frame}
 
@@ -133,12 +134,12 @@
   \label{fig:interaction_list}
   \end{figure}
   \pause
-  \item Then for a point $x$, the potential is approximately \textbf{\textcolor{red}{ACCURACY?}}
+  \item Then for a point $x$, the potential is approximately
     \[
-    u(x) \approx \sum_{\ell=1}^{O(\log N)}\sum_{m=0}^p w_{\ell,k(\ell),m} S_m\pr{x_{\ell, k(\ell)}^* - x}
+    u(x) = \sum_{\ell=1}^{O(\log N)}\sum_{m=0}^p w_{\ell,k(\ell),m} S_m\pr{x_{\ell, k(\ell)}^* - x} + O\pr{2^{-p}}
     \]
   \pause
-  \item \textbf{\textcolor{red}{TOTAL COST?}} Total cost is $O(N\log N)$
+  \item Total cost is $O(N\log N)$
   \end{itemize}
 \end{frame}
 
@@ -191,7 +192,7 @@
     \pause
     \begin{figure}
     \begin{center}
-    \includegraphics[width=0.85\textwidth, angle=0]{{varying_m_n32768_p5_8}.png}
+    \includegraphics[width=0.85\textwidth, angle=0]{{varying_m_n32768_p5_4_8}.png}
     \end{center}
     %\caption{S}
     \label{fig:comp_vers}
@@ -212,14 +213,15 @@
 
 \begin{frame}{Results: Weak Scalability}
     \pause
-    Starting with $n=8192$, max pts $=512$, and $p=5$, as work doubles we double thread number $p$ 
-    %\begin{figure}
-    %\begin{center}
-    %\includegraphics[width=0.85\textwidth, angle=0]{{varying_m_n32768_p5_8}.png}
-    %\end{center}
+    $n=8192$, max pts $=2048$, and $p=5$
+    \begin{figure}
+    \begin{center}
+    \includegraphics[width=0.5\textwidth, angle=0]{{weak_scalability}.png}
+    \includegraphics[width=0.5\textwidth, angle=0]{{weak_scalability2}.png}
+    \end{center}
     %\caption{S}
-    %\label{fig:comp_vers}
-    %\end{figure}
+    \label{fig:weak_scalability}
+    \end{figure}
 \end{frame}
 
 \begin{frame}{Supplemental Slides}
@@ -267,19 +269,6 @@
     \[
     u(x) = \sum_{\ell=1}^{O(\log N)}\sum_{m=0}^p w_{\ell,k(\ell),m} S_m\pr{x_{\ell, k(\ell)}^* - x}
     \]
-  \end{itemize}
-\end{frame}
-
-\begin{frame}{Interaction List}
-  \begin{itemize}
-  \item At each level, only 'interact' with up to 3 far-field cells \emph{not already included at higher levels}
-  \begin{figure}
-  \begin{center}
-  \includegraphics[width=0.65\textwidth, angle=0]{{interaction_list}.pdf}
-  \end{center}
-  %\caption{S}
-  \label{fig:interaction_list}
-  \end{figure}
   \end{itemize}
 \end{frame}
 
