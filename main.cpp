@@ -242,10 +242,6 @@ void compute_potential(double* u, Node* tree) {
     // continue computing far-field terms by expansion
 		#pragma omp parallel num_threads(THREADNUM) if((tree->level < std::log2(THREADNUM)) && PVER==2) //if(tree->level==0 && PVER==2)
 		{
-			#pragma omp master
-			{
-			if (VERB) printf("Entering parallel region\n");	
-			}
 			#pragma omp sections
 			{
 				#pragma omp section
@@ -254,7 +250,7 @@ void compute_potential(double* u, Node* tree) {
 				}
 				#pragma omp section
 				{
-			  compute_potential(u, tree->right);
+			  	compute_potential(u, tree->right);
 				}
 			}
 		}
@@ -279,7 +275,6 @@ int main(int argc, char** argv) {
   int max_pts = read_option<int>("-m", argc, argv, "8");
   // number of terms in multipole expansion
   int p = read_option<int>("-p", argc, argv, "1"); 
-
 	
 	// draw and sort a set of n uniform random points in [0,1]
 	double* x = (double*) malloc(n * sizeof(double));
@@ -302,7 +297,8 @@ int main(int argc, char** argv) {
 	double* u = (double*) malloc(n * sizeof(double));
 	for (int i = 0; i < n; i++) u[i] = 0;
 
-	omp_set_nested(true);
+	// if version 2, turn on nesting
+	if (PVER==2) omp_set_nested(true);
 
 	// run barnes_hut
 	Timer tt;
@@ -312,10 +308,10 @@ int main(int argc, char** argv) {
 
 
 	// display potential at source / target points
-	if (VERB) {
+	//if (VERB) {
 	printf("\nPotential:\n");
-	for (int i = 0; i < n; i++) printf("u(%.3f) = %.3f\n", x[i], u[i]);
-	}
+	for (int i = n-5; i < n; i++) printf("u(%.3f) = %.3f\n", x[i], u[i]);
+	//}
 
 	printf("\nn=%d, m=%d, p=%d, time=%f s\n\n", n, max_pts, p, runtime);
 
@@ -323,6 +319,5 @@ int main(int argc, char** argv) {
 	free(q);
 	free(I);
 	free(u);
-	
 	
 }
