@@ -86,7 +86,7 @@
   \pause
   \item Separate sum into \textbf{near-field} and \textbf{far-field} contributions
   \begin{itemize}
-    \item Take \emph{aggregate} effect of far-field charges
+    \item Take \emph{aggregate} effect of far-field charges via \textbf{Taylor series expansion}
   \end{itemize}
   \end{itemize}
     \begin{figure}
@@ -98,8 +98,134 @@
     \end{figure}
 \end{frame}
 
-\begin{frame}{Approximating far-field}
+\begin{frame}{Tree Algorithm by Barnes and Hut, complexity $O(N\log N)$}
   \pause
+  \begin{itemize}
+    \item For a set of points $x_j$, potential contribution can be approximated:
+    \[
+    \sum_{j\in\text{far-field}} q_j\phi(x-x_j) \approx \sum_{m=0}^p \underbrace{\br{\sum_{j\in\text{far-field}} q_j a_m(x_j-x^*)}}_{\text{weight }m} S_m(x^*-x)+ O(\delta^{p+1})
+    \]
+    \pause
+    \item For $N$ particles, partition $[0,1]$ uniformly at $O(\log N)$ levels:
+      \begin{figure}
+    \begin{center}
+    \includegraphics[width=0.65\textwidth, angle=0]{{binary_tree_FMM}.png}
+    \end{center}
+    %\caption{S}
+    \label{fig:binary_tree}
+    \end{figure}
+    \pause
+    \item For each $T_{\ell, k}$ cell, compute weights $w_{\ell,k,m}$. \textbf{\textcolor{red}{COST?}}
+  \end{itemize}
+\end{frame}
+
+
+\begin{frame}{Tree Algorithm by Barnes and Hut: Interaction List}
+  \pause
+  \begin{itemize}
+  \item At each level, only 'interact' with up to 3 far-field cells \emph{not already included at higher levels}
+  \pause
+  \begin{figure}
+  \begin{center}
+  \includegraphics[width=0.55\textwidth, angle=0]{{interaction_list}.pdf}
+  \end{center}
+  %\caption{S}
+  \label{fig:interaction_list}
+  \end{figure}
+  \pause
+  \item Then for a point $x$, the potential is approximately \textbf{\textcolor{red}{ACCURACY?}}
+    \[
+    u(x) \approx \sum_{\ell=1}^{O(\log N)}\sum_{m=0}^p w_{\ell,k(\ell),m} S_m\pr{x_{\ell, k(\ell)}^* - x}
+    \]
+  \pause
+  \item \textbf{\textcolor{red}{TOTAL COST?}} Total cost is $O(N\log N)$
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Serial implementation}
+    \pause
+    \begin{itemize}
+        \item Successfully implemented the serial code for the algorithm, making use of a tree data type
+        \pause
+        \item Confirmation of $O(N\log N)$ cost:
+         \begin{figure}
+        \begin{center}
+        \includegraphics[width=0.65\textwidth, angle=0]{{varying_n_m32_p5}.png}
+        \end{center}
+        %\caption{S}
+        \label{fig:serial_confirm}
+        \end{figure}
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Parallelism}
+    \pause
+    \begin{itemize}
+        \item Parallelizing with OpenMP
+        \pause
+        \begin{itemize}
+            \item \emph{Challenge:}  \pause Recursive tree code may prevent significant speedup
+        \end{itemize}
+        \pause
+        \item Two options of how to parallelize
+        \pause
+        \item \textbf{OPTION 1:} Parallelize the loops in the code
+        \pause
+        \begin{itemize}
+            \item computing weights, adding near-field terms, and adding far-field terms 
+            \pause
+            \item \emph{Potential Problem:} Loops of varying sizes, possibly large overhead
+        \pause
+        \end{itemize}
+        \item \textbf{OPTION 2:} Distribute the work in the tree among threads
+        \pause
+        \begin{itemize}
+            \item At tree levels $\ell<O(\log p)$ for $p$ threads, open a new section
+            \pause
+            \item \emph{Potential Problem:} Nested parallelism 
+        \end{itemize}
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Results: Comparing Parallel Options}
+    \pause
+    \begin{figure}
+    \begin{center}
+    \includegraphics[width=0.85\textwidth, angle=0]{{varying_m_n32768_p5_8}.png}
+    \end{center}
+    %\caption{S}
+    \label{fig:comp_vers}
+        \end{figure}
+\end{frame}
+
+\begin{frame}{Results: Strong Scalability}
+    \pause
+    \begin{figure}
+    \begin{center}
+    \includegraphics[width=0.5\textwidth, angle=0]{{strong_scalability}.png}
+    \includegraphics[width=0.5\textwidth, angle=0]{{strong_scalability2}.png}
+    \end{center}
+    %\caption{S}
+    \label{fig:strong_scalability}
+        \end{figure}
+\end{frame}
+
+\begin{frame}{Results: Weak Scalability}
+    \pause
+    Starting with $n=8192$, max pts $=512$, and $p=5$, as work doubles we double thread number $p$ 
+    %\begin{figure}
+    %\begin{center}
+    %\includegraphics[width=0.85\textwidth, angle=0]{{varying_m_n32768_p5_8}.png}
+    %\end{center}
+    %\caption{S}
+    %\label{fig:comp_vers}
+    %\end{figure}
+\end{frame}
+
+\begin{frame}{Supplemental Slides}
+\end{frame}
+
+\begin{frame}{Approximating far-field}
   \begin{itemize}
   \item Use \textbf{Taylor series expansion} of $\phi(x-x_j)$ for small $\delta = \dfrac{x_j-x^*}{x^*-x}$:
   \begin{align*}
@@ -108,18 +234,16 @@
   & = \sum_{m=0}^p a_m(x_j-x^*)S_m(x^*-x) + O(\delta^{p+1})
   \end{align*}
   %$a_k(x_j-x^*) = \dfrac{\phi^{(k)}(1)}{k!}(x_j-x^*)^k$\quad and\quad $S_k(x^*-x)=\dfrac{\phi(x^*-x)}{(x^*-x)^k}$
-  \pause
   \item Then potential from $x_j\in\text{far-field}$ is
   \[
   \sum_{j\in\text{far-field}} q_j\phi(x-x_j) \approx \sum_{m=0}^p \br{\sum_{j\in\text{far-field}} q_j a_m(x_j-x^*)} S_m(x^*-x)+ O(\delta^{p+1})
   \]
-  \pause
   \item Accuracy depends on choice of $x^*$ and thus size of  $\delta = \dfrac{x_j-x^*}{x^*-x}$
   \end{itemize}
 \end{frame}
 
 \begin{frame}{Tree Algorithm by Barnes and Hut, complexity $O(N\log N)$}
-  \pause
+
   \begin{itemize}
     \item For $N$ particles, partition $[0,1]$ uniformly at $O(\log N)$ levels:
 
@@ -131,14 +255,14 @@
   \label{fig:binary_tree}
   \end{figure}
 
-    \pause
+
     \item Let $T_{\ell, k}$ be the cell at level $\ell$ with index $k=1:2^{\ell}$ with center $x_{\ell,k}^*$.
-    \pause
+
     \item Compute weight at each cell, total cost $O(N\log N)$
     \[
     w_{\ell, k, m} = \sum_{x_j \in T_{\ell,k}} q_j a_m(x_j-x_{\ell,k}^*)
     \]
-    \pause
+
     \item For a point $x$: far-field components added at increasingly \emph{coarse} levels
     \[
     u(x) = \sum_{\ell=1}^{O(\log N)}\sum_{m=0}^p w_{\ell,k(\ell),m} S_m\pr{x_{\ell, k(\ell)}^* - x}
@@ -147,10 +271,8 @@
 \end{frame}
 
 \begin{frame}{Interaction List}
-  \pause
   \begin{itemize}
   \item At each level, only 'interact' with up to 3 far-field cells \emph{not already included at higher levels}
-  \pause
   \begin{figure}
   \begin{center}
   \includegraphics[width=0.65\textwidth, angle=0]{{interaction_list}.pdf}
@@ -159,34 +281,6 @@
   \label{fig:interaction_list}
   \end{figure}
   \end{itemize}
-\end{frame}
-
-\begin{frame}{Parallelism}
-    \pause
-    \begin{itemize}
-        \item Parallelize with OpenMP
-        \pause
-        \begin{itemize}
-            \item \emph{Challenge:}  \pause Recursive tree code may prevent significant speedup
-        \end{itemize}
-        \pause
-        \item Partition the memory and work with MPI
-        \pause
-        \begin{itemize}
-            \item \emph{Challenge:} \pause Minimizing communication between cores
-        \end{itemize}
-    \end{itemize}
-\end{frame}
-
-\begin{frame}{Results}
-    \pause
-    \begin{itemize}
-        \item Speed-up
-        \pause
-        \item How we measured speed-up
-        \pause
-        \item What did we expect? Is there some unavoidable overhead?
-    \end{itemize}
 \end{frame}
 
 
