@@ -308,10 +308,10 @@ int main(int argc, char** argv) {
 
 
 	// display potential at source / target points
-	//if (VERB) {
+	if (VERB) {
 	printf("\nPotential:\n");
-	for (int i = n-5; i < n; i++) printf("u(%.3f) = %.3f\n", x[i], u[i]);
-	//}
+	for (int i = 0; i < n; i++) printf("u(%.3f) = %.3f\n", x[i], u[i]);
+	}
 
 	printf("\nn=%d, m=%d, p=%d, time=%f s\n\n", n, max_pts, p, runtime);
 
