@@ -10,7 +10,7 @@
 #include "utils.h"
 
 #define VERB 0
-#define THREADNUM 8
+#define THREADNUM 1
 #define PVER 2
 
 struct Node {
@@ -84,7 +84,7 @@ Node* build_tree(
 
 void compute_weights(Node* tree) {
 
-	#pragma omp parallel num_threads(THREADNUM) if(PVER==1) //if(tree->n > 50 && tree->p > 4)
+	#pragma omp parallel num_threads(THREADNUM) if(PVER==1)
 	{
 	#pragma omp for
 	for (int m = 0; m < tree->p; m++) {
@@ -110,7 +110,6 @@ void compute_weights(Node* tree) {
 
 void add_near_field(double* u, Node* source, Node* target) {
   // evaluate near-field directly
-	
 	#pragma omp parallel num_threads(THREADNUM) if(PVER==1)
 	{
 	#pragma omp for
@@ -134,7 +133,7 @@ void add_near_field(double* u, Node* source, Node* target) {
 void add_far_field(double* u, Node* source, Node* target) {
   // evaluate far-field using multipole expansions
 
-	#pragma omp parallel num_threads(THREADNUM) if(PVER==1) //if(target->n > 50 && target->p > 4)
+	#pragma omp parallel num_threads(THREADNUM) if(PVER==1)
 	{
 	#pragma omp for schedule(dynamic)
   for (int i = 0; i < target->n; i++) {
