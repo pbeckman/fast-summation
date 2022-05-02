@@ -109,7 +109,7 @@
       & = \sum_{m=0}^p a_m(x_j-x^*)S_m(x^*-y) + O(\delta^{p+1})
     \end{align*}
     \pause
-    \item For a set of points $x_j$, potential contribution can be approximated:
+    \item Potential contribution can be approximated:
     \[
     \hspace{-0.5cm} 
     \sum_{j\in\text{far-field}} q_j\phi(x_j-y) \approx \sum_{m=0}^p \underbrace{\br{\sum_{j\in\text{far-field}} q_j a_m(x_j-x^*)}}_{\text{weight }w} S_m(x^*-y)+ O(\delta^{p+1})
@@ -121,7 +121,7 @@
 \begin{frame}{Barnes-Hut Tree Code: Interaction List}
   \pause
   \begin{itemize}
-  \item compute terms involving far-field cells \emph{not included at higher levels}
+  \item Compute terms involving far-field cells \emph{not included at higher levels}
   \pause
   \begin{columns}
     \begin{column}{0.5\textwidth}
@@ -144,9 +144,9 @@
     \end{column}
   \end{columns}
   \pause
-  \item Then for a point $x$, the potential is approximately
+  \item For a point $y$, the potential is approximated by
     \[
-    u(x) = \sum_{\ell=1}^{O(\log N)}\sum_{m=0}^p w_{\ell,k(\ell),m} S_m\pr{x_{\ell, k(\ell)}^* - x} + O\pr{2^{-p}}
+    u(y) = \sum_{\ell=1}^{O(\log N)}\sum_{m=0}^p w_{\ell,k(\ell),m} S_m\pr{x_{\ell, k(\ell)}^* - y} + O\pr{\frac{1}{2^p}}
     \]
   \pause
   \item For each box, compute weights $w_{\ell,k,m}$ $\longrightarrow$ total cost $O(N\log N)$
