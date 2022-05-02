@@ -10,7 +10,7 @@
 #include "utils.h"
 
 #define VERB 0
-#define THREADNUM 1
+#define THREADNUM 8
 #define PVER 2
 
 struct Node {
@@ -103,9 +103,21 @@ void compute_weights(Node* tree) {
 
   // traverse the tree
   if (tree->left) {
-    compute_weights(tree->left); 
-    compute_weights(tree->right);
-  }
+		#pragma omp parallel num_threads(THREADNUM) if((tree->level < std::log2(THREADNUM)) && PVER==2)
+		{
+			#pragma omp sections
+			{
+				#pragma omp section
+				{
+		  	compute_weights(tree->left); 
+				}
+				#pragma omp section
+				{
+		  	compute_weights(tree->right);
+				}
+			}
+		}  
+	}
 }
 
 void add_near_field(double* u, Node* source, Node* target) {
@@ -239,7 +251,7 @@ void compute_potential(double* u, Node* tree) {
   // traverse the tree
   if (tree->left) {
     // continue computing far-field terms by expansion
-		#pragma omp parallel num_threads(THREADNUM) if((tree->level < std::log2(THREADNUM)) && PVER==2) //if(tree->level==0 && PVER==2)
+		#pragma omp parallel num_threads(THREADNUM) if((tree->level < std::log2(THREADNUM)) && PVER==2) 
 		{
 			#pragma omp sections
 			{
