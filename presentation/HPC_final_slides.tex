@@ -14,6 +14,7 @@
 \usepackage{amsmath, amsthm, amssymb, amsfonts, mathtools, xfrac, dsfont}
 \usepackage{hyperref}
 \usepackage{bm}
+\usepackage{xcolor}
 
 % grouping and bookending
 \newcommand{\pr}[1]{\left(#1\right)}
@@ -91,62 +92,67 @@
   \end{itemize}
   \end{itemize}
     \begin{figure}
-    \begin{center}
-    \includegraphics[width=0.85\textwidth, angle=0]{{far_field_image}.pdf}
-    \end{center}
-    %\caption{S}
-    \label{fig:far_field_approx}
+      \begin{center}
+      \includegraphics[width=0.85\textwidth, angle=0]{{far_field_image}.pdf}
+      \end{center}
     \end{figure}
 \end{frame}
 
 \begin{frame}{Barnes-Hut Tree Code: Taylor Expansion}
   \pause
   \begin{itemize}
+    \item Use \textbf{Taylor series expansion} of $\phi$ for small $\delta = \dfrac{x_j-x^*}{x^*-y}$:
+    \begin{align*}
+      \phi(x_j-y) 
+      &= \phi(x^*-y)\phi(1+\delta)\\
+      & \approx \phi(x^*-y)\br{\sum_{m=0}^p \dfrac{\phi^{(m)}(1)}{m!}\delta^m + O(\delta^{p+1})}\\
+      & = \sum_{m=0}^p a_m(x_j-x^*)S_m(x^*-y) + O(\delta^{p+1})
+    \end{align*}
+    \pause
     \item For a set of points $x_j$, potential contribution can be approximated:
     \[
-    \hspace{-0.5cm} \sum_{j\in\text{far-field}} q_j\phi(x-x_j) \approx \sum_{m=0}^p \underbrace{\br{\sum_{j\in\text{far-field}} q_j a_m(x_j-x^*)}}_{\text{weight }m} S_m(x^*-x)+ O(\delta^{p+1})
+    \hspace{-0.5cm} 
+    \sum_{j\in\text{far-field}} q_j\phi(x_j-y) \approx \sum_{m=0}^p \underbrace{\br{\sum_{j\in\text{far-field}} q_j a_m(x_j-x^*)}}_{\text{weight }w} S_m(x^*-y)+ O(\delta^{p+1})
     \]
-    \pause
-    \item For $N$ particles, partition $[0,1]$ uniformly at $O(\log N)$ levels:
-    \begin{figure}
-      \begin{center}
-      \includegraphics[width=0.65\textwidth, angle=0]{{binary_tree_FMM}.png}
-      \end{center}
-    \end{figure}
-    \pause
-    \item For each $T_{\ell, k}$ cell, compute weights $w_{\ell,k,m}$ $\longrightarrow$ total cost $O(N\log N)$
   \end{itemize}
 \end{frame}
 
 
-\begin{frame}{Tree Code by Barnes and Hut: Interaction List}
+\begin{frame}{Barnes-Hut Tree Code: Interaction List}
   \pause
   \begin{itemize}
-  \item At each level, only 'interact' with up to 3 far-field cells \emph{not already included at higher levels}
+  \item compute terms involving far-field cells \emph{not included at higher levels}
   \pause
-  \begin{figure}
-  \begin{center}
-  \includegraphics[width=0.55\textwidth, angle=0]{{interaction_list}.pdf}
-  \end{center}
-  %\caption{S}
-  \label{fig:interaction_list}
-  \end{figure}
+  \begin{columns}
+    \begin{column}{0.5\textwidth}
+      \begin{figure}
+        \begin{center}
+        \includegraphics[width=0.9\textwidth, angle=0]{{interaction_list}.pdf}
+        \end{center}
+        %\caption{S}
+        \label{fig:interaction_list}
+        \end{figure}
+    \end{column}
+    \begin{column}{0.5\textwidth}
+      \begin{figure}
+        \begin{center}
+          \only<6->{
+            \includegraphics[width=0.9\textwidth, angle=0]{{varying_n_m32_p5}.png}
+          }
+        \end{center}
+      \end{figure}
+    \end{column}
+  \end{columns}
   \pause
   \item Then for a point $x$, the potential is approximately
     \[
     u(x) = \sum_{\ell=1}^{O(\log N)}\sum_{m=0}^p w_{\ell,k(\ell),m} S_m\pr{x_{\ell, k(\ell)}^* - x} + O\pr{2^{-p}}
     \]
   \pause
-  \item Total cost is $O(N\log N)$
+  \item For each box, compute weights $w_{\ell,k,m}$ $\longrightarrow$ total cost $O(N\log N)$
   \end{itemize}
 
-  \begin{figure}
-    \begin{center}
-    \includegraphics[width=0.65\textwidth, angle=0]{{varying_n_m32_p5}.png}
-    \end{center}
-    %\caption{S}
-    \label{fig:serial_confirm}
-    \end{figure}
+  
 \end{frame}
 
 \begin{frame}{Parallelism}
@@ -218,52 +224,63 @@
     \texttt{crunchy1}: AMD Opteron 6272 (2.1 GHz) 
 \end{frame}
 
-\begin{frame}{Supplemental Slides}
+\begin{frame}{References}
+  {\color{white}
+  \cite{barnes1986hierarchical}
+  \cite{chenintroduction}
+  \cite{greengard1987fast}
+  }
+  \bibliographystyle{amsalpha}
+  \bibliography{./refs.bib}
 \end{frame}
 
-\begin{frame}{Approximating far-field}
-  \begin{itemize}
-  \item Use \textbf{Taylor series expansion} of $\phi(x-x_j)$ for small $\delta = \dfrac{x_j-x^*}{x^*-x}$:
-  \begin{align*}
-  \phi(x_j-x) & = \phi\pr{(x^*-x)\pr{1+\delta}}= \phi(x^*-x)\phi(1+\delta)\\
-  & \approx \phi(x^*-x)\br{\sum_{m=0}^p \dfrac{\phi^{(m)}(1)}{m!}\delta^m + O(\delta^{p+1})}\\
-  & = \sum_{m=0}^p a_m(x_j-x^*)S_m(x^*-x) + O(\delta^{p+1})
-  \end{align*}
-  %$a_k(x_j-x^*) = \dfrac{\phi^{(k)}(1)}{k!}(x_j-x^*)^k$\quad and\quad $S_k(x^*-x)=\dfrac{\phi(x^*-x)}{(x^*-x)^k}$
-  \item Then potential from $x_j\in\text{far-field}$ is
-  \[
-  \sum_{j\in\text{far-field}} q_j\phi(x-x_j) \approx \sum_{m=0}^p \br{\sum_{j\in\text{far-field}} q_j a_m(x_j-x^*)} S_m(x^*-x)+ O(\delta^{p+1})
-  \]
-  \item Accuracy depends on choice of $x^*$ and thus size of  $\delta = \dfrac{x_j-x^*}{x^*-x}$
-  \end{itemize}
-\end{frame}
+% \begin{frame}{Supplemental Slides}
+% \end{frame}
 
-\begin{frame}{Tree Algorithm by Barnes and Hut, complexity $O(N\log N)$}
+% \begin{frame}{Approximating far-field}
+%   \begin{itemize}
+%   \item Use \textbf{Taylor series expansion} of $\phi(x-x_j)$ for small $\delta = \dfrac{x_j-x^*}{x^*-x}$:
+%   \begin{align*}
+%   \phi(x_j-x) 
+%   &= \phi(x^*-x)\phi(1+\delta)\\
+%   & \approx \phi(x^*-x)\br{\sum_{m=0}^p \dfrac{\phi^{(m)}(1)}{m!}\delta^m + O(\delta^{p+1})}\\
+%   & = \sum_{m=0}^p a_m(x_j-x^*)S_m(x^*-x) + O(\delta^{p+1})
+%   \end{align*}
+%   %$a_k(x_j-x^*) = \dfrac{\phi^{(k)}(1)}{k!}(x_j-x^*)^k$\quad and\quad $S_k(x^*-x)=\dfrac{\phi(x^*-x)}{(x^*-x)^k}$
+%   \item Then potential from $x_j\in\text{far-field}$ is
+%   \[
+%   \sum_{j\in\text{far-field}} q_j\phi(x-x_j) \approx \sum_{m=0}^p \br{\sum_{j\in\text{far-field}} q_j a_m(x_j-x^*)} S_m(x^*-x)+ O(\delta^{p+1})
+%   \]
+%   \item Accuracy depends on choice of $x^*$ and thus size of  $\delta = \dfrac{x_j-x^*}{x^*-x}$
+%   \end{itemize}
+% \end{frame}
 
-  \begin{itemize}
-    \item For $N$ particles, partition $[0,1]$ uniformly at $O(\log N)$ levels:
+% \begin{frame}{Tree Algorithm by Barnes and Hut, complexity $O(N\log N)$}
 
-  \begin{figure}
-  \begin{center}
-  \includegraphics[width=0.65\textwidth, angle=0]{{binary_tree_FMM}.png}
-  \end{center}
-  %\caption{S}
-  \end{figure}
+%   \begin{itemize}
+%     \item For $N$ particles, partition $[0,1]$ uniformly at $O(\log N)$ levels:
+
+%   \begin{figure}
+%   \begin{center}
+%   \includegraphics[width=0.65\textwidth, angle=0]{{binary_tree_FMM}.png}
+%   \end{center}
+%   %\caption{S}
+%   \end{figure}
 
 
-    \item Let $T_{\ell, k}$ be the cell at level $\ell$ with index $k=1:2^{\ell}$ with center $x_{\ell,k}^*$.
+%     \item Let $T_{\ell, k}$ be the cell at level $\ell$ with index $k=1:2^{\ell}$ with center $x_{\ell,k}^*$.
 
-    \item Compute weight at each cell, total cost $O(N\log N)$
-    \[
-    w_{\ell, k, m} = \sum_{x_j \in T_{\ell,k}} q_j a_m(x_j-x_{\ell,k}^*)
-    \]
+%     \item Compute weight at each cell, total cost $O(N\log N)$
+%     \[
+%     w_{\ell, k, m} = \sum_{x_j \in T_{\ell,k}} q_j a_m(x_j-x_{\ell,k}^*)
+%     \]
 
-    \item For a point $x$: far-field components added at increasingly \emph{coarse} levels
-    \[
-    u(x) = \sum_{\ell=1}^{O(\log N)}\sum_{m=0}^p w_{\ell,k(\ell),m} S_m\pr{x_{\ell, k(\ell)}^* - x}
-    \]
-  \end{itemize}
-\end{frame}
+%     \item For a point $x$: far-field components added at increasingly \emph{coarse} levels
+%     \[
+%     u(x) = \sum_{\ell=1}^{O(\log N)}\sum_{m=0}^p w_{\ell,k(\ell),m} S_m\pr{x_{\ell, k(\ell)}^* - x}
+%     \]
+%   \end{itemize}
+% \end{frame}
 
 
 \end{document}
