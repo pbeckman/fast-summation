@@ -58,7 +58,7 @@
 \newcommand{\ind}[1]{\mathds{1}_{#1}}
 \renewcommand{\epsilon}{\varepsilon}
 
-\title[Footer Title]{Parallel Fast Multipole}
+\title[Parallel Multipole Methods]{Parallel Multipole Methods}
 \institute[]{NYU Courant}
 \author{Paul Beckman, Mariya Savinov}
 \date{\today}
@@ -99,21 +99,19 @@
     \end{figure}
 \end{frame}
 
-\begin{frame}{Tree Algorithm by Barnes and Hut, complexity $O(N\log N)$}
+\begin{frame}{Barnes-Hut Tree Code: Taylor Expansion}
   \pause
   \begin{itemize}
     \item For a set of points $x_j$, potential contribution can be approximated:
     \[
-    \sum_{j\in\text{far-field}} q_j\phi(x-x_j) \approx \sum_{m=0}^p \underbrace{\br{\sum_{j\in\text{far-field}} q_j a_m(x_j-x^*)}}_{\text{weight }m} S_m(x^*-x)+ O(\delta^{p+1})
+    \hspace{-0.5cm} \sum_{j\in\text{far-field}} q_j\phi(x-x_j) \approx \sum_{m=0}^p \underbrace{\br{\sum_{j\in\text{far-field}} q_j a_m(x_j-x^*)}}_{\text{weight }m} S_m(x^*-x)+ O(\delta^{p+1})
     \]
     \pause
     \item For $N$ particles, partition $[0,1]$ uniformly at $O(\log N)$ levels:
-      \begin{figure}
-    \begin{center}
-    \includegraphics[width=0.65\textwidth, angle=0]{{binary_tree_FMM}.png}
-    \end{center}
-    %\caption{S}
-    \label{fig:binary_tree}
+    \begin{figure}
+      \begin{center}
+      \includegraphics[width=0.65\textwidth, angle=0]{{binary_tree_FMM}.png}
+      \end{center}
     \end{figure}
     \pause
     \item For each $T_{\ell, k}$ cell, compute weights $w_{\ell,k,m}$ $\longrightarrow$ total cost $O(N\log N)$
@@ -121,7 +119,7 @@
 \end{frame}
 
 
-\begin{frame}{Tree Algorithm by Barnes and Hut: Interaction List}
+\begin{frame}{Tree Code by Barnes and Hut: Interaction List}
   \pause
   \begin{itemize}
   \item At each level, only 'interact' with up to 3 far-field cells \emph{not already included at higher levels}
@@ -141,22 +139,14 @@
   \pause
   \item Total cost is $O(N\log N)$
   \end{itemize}
-\end{frame}
 
-\begin{frame}{Serial implementation}
-    \pause
-    \begin{itemize}
-        \item Successfully implemented the serial code for the algorithm, making use of a tree data type
-        \pause
-        \item Confirmation of $O(N\log N)$ cost:
-         \begin{figure}
-        \begin{center}
-        \includegraphics[width=0.65\textwidth, angle=0]{{varying_n_m32_p5}.png}
-        \end{center}
-        %\caption{S}
-        \label{fig:serial_confirm}
-        \end{figure}
-    \end{itemize}
+  \begin{figure}
+    \begin{center}
+    \includegraphics[width=0.65\textwidth, angle=0]{{varying_n_m32_p5}.png}
+    \end{center}
+    %\caption{S}
+    \label{fig:serial_confirm}
+    \end{figure}
 \end{frame}
 
 \begin{frame}{Parallelism}
@@ -181,7 +171,7 @@
         \item \textbf{OPTION 2:} Distribute the work in the tree among threads
         \pause
         \begin{itemize}
-            \item At tree levels $\ell<O(\log p)$ for $p$ threads, open a new section
+            \item At tree levels $\ell<O(\log r)$ for $r$ threads, open a new section
             \pause
             \item \emph{Potential Problem:} Nested parallelism 
         \end{itemize}
@@ -191,16 +181,18 @@
 \begin{frame}{Results: Comparing Parallel Options}
     \pause
     \begin{figure}
-    \begin{center}
-    \includegraphics[width=0.85\textwidth, angle=0]{{varying_m_n32768_p5_4_8}.png}
-    \end{center}
-    %\caption{S}
-    \label{fig:comp_vers}
-        \end{figure}
+      \begin{center}
+      \includegraphics[width=0.85\textwidth, angle=0]{{varying_m_n32768_p5_4_8}.png}
+      \end{center}
+      %\caption{S}
+      \label{fig:comp_vers}
+    \end{figure}
+    \texttt{crackle1}: Intel Xeon E5630 (2.53 GHz)
 \end{frame}
 
-\begin{frame}{Results: Strong Scalability}
+\begin{frame}{Results: Strong Scaling}
     \pause
+    $n=32768$, max points in box $2048$, and $p=5$
     \begin{figure}
     \begin{center}
     \includegraphics[width=0.5\textwidth, angle=0]{{strong_scalability}.png}
@@ -208,12 +200,13 @@
     \end{center}
     %\caption{S}
     \label{fig:strong_scalability}
-        \end{figure}
+    \end{figure}
+    \texttt{crunchy1}: AMD Opteron 6272 (2.1 GHz) 
 \end{frame}
 
-\begin{frame}{Results: Weak Scalability}
+\begin{frame}{Results: Weak Scaling}
     \pause
-    $n=8192$, max pts $=2048$, and $p=5$
+    $n=8192 \cdot r$, max points in box $=2048$, and $p=5$
     \begin{figure}
     \begin{center}
     \includegraphics[width=0.5\textwidth, angle=0]{{weak_scalability}.png}
@@ -222,6 +215,7 @@
     %\caption{S}
     \label{fig:weak_scalability}
     \end{figure}
+    \texttt{crunchy1}: AMD Opteron 6272 (2.1 GHz) 
 \end{frame}
 
 \begin{frame}{Supplemental Slides}
@@ -254,7 +248,6 @@
   \includegraphics[width=0.65\textwidth, angle=0]{{binary_tree_FMM}.png}
   \end{center}
   %\caption{S}
-  \label{fig:binary_tree}
   \end{figure}
 
 
