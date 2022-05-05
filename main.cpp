@@ -11,7 +11,7 @@
 
 #define VERB 0
 #define THREADNUM 8
-#define PVER 2
+#define PVER 1
 
 struct Node {
   double* x = NULL;  // array of points
@@ -147,7 +147,7 @@ void add_far_field(double* u, Node* source, Node* target) {
 
 	#pragma omp parallel num_threads(THREADNUM) if(PVER==1)
 	{
-	#pragma omp for schedule(dynamic)
+	#pragma omp for
   for (int i = 0; i < target->n; i++) {
     for (int m = 0; m < target->p; m++) {
       // add approximate potential term w_{i,m} * S_m(c - x[i]) 
