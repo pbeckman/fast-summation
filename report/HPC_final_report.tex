@@ -51,9 +51,12 @@
 \newcommand{\ind}[1]{\mathds{1}_{#1}}
 \renewcommand{\epsilon}{\varepsilon}
 
+\newcommand {\beq} {\begin{equation}}
+\newcommand {\eeq} {\end{equation}}
+
 \setlength\parindent{0pt}
 
-\title{High Performance Computing: Final Project Proposal}
+\title{High Performance Computing: Final Project Report}
 \author{Paul Beckman, Mariya Savinov}
 \date{March 28, 2022}
 
@@ -61,48 +64,79 @@
 
 \maketitle
 
-We would like to implement and test the parallelization of tree code \cite{barnes1986hierarchical} / fast multipole methods \cite{greengard1987fast} for the rapid evaluation of the total potential for a collection of particles interacting through a conservative force, e.g. the electrostatic potential for a collection of point charges. As a brief exposition of the problem, consider points $x_1, ..., x_n \in [0,1] = I$ with charges $q_1, ..., q_n$. We limit the positions to a one-dimensional problem so that we can focus on computational aspects, but imagine we are embedded in $\R^3$ so that the potential at $x$ of a particle at point $x_j$ with unit charge is
-\begin{equation}
-  \phi(x) = \frac{C}{\abs{x-x_j}}.
-\end{equation}
-where $C$ is some scaling factor (e.g. the Coulomb constant) which we will take to be $C=1$. We would like to evaluate the potential
-\begin{equation}
-  u(x_i) = \sum_{j=1}^n q_j \phi(\abs{x_i - x_j}) = \sum_{j=1}^n \dfrac{q_j}{\abs{x_i-x_j}}
-\end{equation}
-for each $x_i$, which in practice one would then use to compute forces between particles. The tree code / fast multipole idea is to hierarchically partition the interval $[0,1]$ using a binary tree, and accurately approximate
-\begin{equation}
-  u_k(x_i) = \sum_{x_j \in I_k} q_j \phi(\abs{x_i - x_j})
-\end{equation} for all subintervals $I_k$ sufficiently far from $x_i$ by representing $\phi$ with its truncated Taylor series. One then repeats this computation for various levels in the hierarchy.
+\section{Introduction}
+Many settings in physics involve a collection of particles/masses interacting through conservative forces -- meaning, forces which can be defined by some scalar potential function $u({x})$. For example, the electrostatic potential for a collection of point charges, or the gravitational potential for a collection of masses. In order to determine the particle dynamics, one must evaluate the total system potential at each particle point. As such, particularly when there are a large number $N$-many particles, we are interested in the rapid evaluation of this potential.\\\\
+Let us consider points $x_1,...,x_n\in[0,1]=I$ with charges $q_1,...,q_n$ (equivalently, masses). We limit the positions to a one-dimensional problem to focus on the computational aspects, but imagine these particles to be embedded in $\R^3$ so that the potential at $x$ due to a particle at point $x_j$ with unit charge is
+\beq
+        \phi(x) = \frac{C}{\abs{x-x_j}}.
+\eeq
+where $C$ is some scaling factor (e.g. the Coulomb constant) taken in our calculations to be $C=1$. The total potential is then
+\beq
+        u(x_i) = \sum_{j=1}^n q_j \phi(\abs{x_i - x_j}) = \sum_{j=1}^n \dfrac{q_j}{\abs{x_i-x_j}}
+\label{eq:potential}
+\eeq
+which we seek to evaluate for each $x_i$. The idea will be to hierarchically partition the interval and take advantage of Taylor series expansions to approximate far-field contributions as given by a single particle at the center of mass.
 
-The primary computational questions involve the efficient distribution of the hierarchical data structure and computations across processes. We plan to approach these questions through the following tasks
-\begin{itemize}
-  \item Implement a serial $\O(n\log n)$ Barnes-Hut type tree-code
-  \item Parallelize this approach using OpenMP, experimenting with tuning for improved cache usage
-  \item Parallelize this approach using MPI, experimenting with communication minimization between cores
-  \item (If time allows) improve tree code to an $\O(n)$ fast multipole method and modify parallelism accordingly
-\end{itemize}
-
+\section{Barnes-Hut Tree Code}
 \begin{figure}
   \centering
   \includegraphics[width=0.55\textwidth]{./figures/varying_n_m32_p5.png}
 \end{figure}
 
+
+\section{Parallelism}
+We parallelize this tree-code with OpenMP. Recall that this {\tt barnes\_hut} algorithm runs in two steps: first the weights are computed via {\tt compute\_weights} and then the potential is computed using the pre-computed weights by {\tt compute\_potential}. In each step, starting from level 0 the tree is traversed by the function calling itself at each daughter cell. Within a cell, {\tt compute\_weights} includes work that loops over each moment and each point in the cell. Meanwhile, {\tt compute\_potential} has work split in two parts: adding near field terms, which involves loops over each point pair in the cell, and adding far field terms, which involves loops over each moment and each point in the cell. This structure suggests two options of parallelism.
+\subsection{Loop parallelism}
+The first option is to parallelize the loops involved in computing the weights, adding near-field terms, and adding far-field terms. In each cell for each of these loop sections, a parallel region is opened and the manager thread creates a team with the user-specified number of threads. Generally the work for each thread for a given loop is fairly similar, so the default static mapping is appropriate (and use of, for example, dynamic scheduling we see only serves to yield a slight {increase} in runtime).\\\\
+However, the potential problem lies in the \emph{varying sizes} of these loops depending on location in the tree. At the finest level, there are few points in each cell (sometimes less than the number of threads), so there is little benefit to loop parallelism. We will see that, indeed, if the max points at the smallest level or total moment number $p$ are small, then there is a large overhead cost in including these parallel directives in small cells (as observed through the runtime).
 \begin{figure}
   \centering
-  \includegraphics[width=0.55\textwidth]{./figures/varying_m_n32768_p5_4_8.png}
+  \includegraphics[width=0.55\textwidth]{./figures/{tree_parallelism}.pdf}
+  \caption{Tree traversal for 'Work parallelism' option.}
+  \label{fig:tree_parallel}
+\end{figure}
+\subsection{Work parallelism}
+The second option is to distribute the work in the tree evenly among available threads. The idea is that in both {\tt compute\_weights} and {\tt compute\_potential}, as long as there are are extra threads available, the recursive calls to the two daughter cells should be done by two independent threads. This can be done by utilizing the {\tt section} directive in OpenMP and {explicitly} enabling nesting, so that each recursive function call opens new threads which run side by side with other threads opened at the same level.\\\\
+Suppose for example that there are 4 total available threads. The tree-traversal then occurs as shown in Fig.~\ref{fig:tree_parallel}, where each color represents a unique thread. At level zero, there is only the master thread (red), which then recruits another thread (blue) to handle the second daughter cell at level 1. Each of these threads (red and blue) at level 2 do the same by recruiting the purple and orange threads for the work at level 2. After this point, there are no available threads, so the remainder of the tree is evenly distributed\footnote{presuming uniform distribution of points} among these four threads which handle the work sequentially for their individual section. In the more general sense, if there are $r$ total threads, at each tree level $\ell<O(\log r)$ the recursive call for daughter cells should be distributed by OpenMP {\tt sections}.\\\\
+The only potential problem lies in the use of nested parallelism, as it is unclear how much overhead or hidden work is involved in determining thread availability and using nested recursive {\tt section} directives. However, this is likely minimal as compared to the overhead we expect and ended up observing for the loop parallelism option.
+\section{Results}
+\subsection{Comparing Parallel Options}
+\begin{figure}
+  \centering
+  \includegraphics[width=0.75\textwidth]{./figures/varying_m_n32768_p5_4_8.png}
+  \caption{Comparison of two parallelism options against the serial implementation for two choices of thread number, varying the number of levels in the tree (i.e. the number of max points at the finest level) while keeping the number of points and largest moment $p$ fixed. Runtimes computed on crackle1 (Intel Xeon E5630, 2.53 GHz).}
+  \label{fig:varying_m}
+\end{figure}
+The difference between the two parallelism options and their effectiveness are best initially compared by considering a fixed number of points $n=2^{15}$ with largest moment $p=5$ and varying the number of points in the smallest box (equivalently, varying the number of levels in the tree). Fig.~\ref{fig:varying_m} shows the runtimes for the Barnes-Hut algorithm when it is run in serial\footnote{OpenMP is not included during code compilation for this case} (black) and when it is run with loop parallelism (ver1, orange) and work parallelism (ver2, blue) for the cases of both 4 threads and 8 threads.\\\\
+For the serial implementation, it makes sense that the runtime is shortest for few max points at the smallest level, as the approximation of the tree algorithm is taken advantage of best here. If there are many points at the smallest level of the tree, then there are more direct near-field particle-particle interactions to compute, so as expected you approach the cost of just direct calculation of the potential without any tree structure at all.\\\\
+The primary difference between the two parallelisms becomes very clear in Fig.~\ref{fig:varying_m}. For loop parallelism (orange), when there are few points at the finest level, the overhead cost of parallelizing the short/small loops at the lower levels becomes significant, and the runtime greatly exceeds that of the serial code. However, speedup can still be achieved, if the max points in the smallest box is sufficiently large (so the tree has fewer levels). If one uses less threads, e.g. the dotted orange line as compared to the solid orange line, then it naturally becomes less expensive for small minimum box sizes as there are fewer threads to synchronize and manage for small loops.  However, the speedup observed on the right side of the figure is smaller if there are less available threads.\\\\
+Unlike loop parallelism, work parallelism (blue) \emph{always performs better than the serial code} and is \emph{always faster with more threads}, as can be seen by the dotted line (4 threads) being consistently larger than the solid line (8 threads). It is clear, at least in regard to 'universal' speedup, that the second type of parallelism where work is evenly distributed among threads is the better choice. It remains to perform some scaling analysis, to determine how the speedup and efficiency of both parallelisms.
+
+\subsection{Strong Scaling}
+\begin{figure}
+  \centering
+  \includegraphics[width=0.48\textwidth]{./figures/strong_scalability.png} %
+  \includegraphics[width=0.48\textwidth]{./figures/strong_scalability2.png}
+  \caption{Results for the two parallelism options in the case of $n=32768$ points, $2048$ points in the smallest box, and $p=5$ moments. (Left) Algorithm runtime is plotted against thread number (from $2$ to $16$ threads). (Right) The speedup $S(r) = t(1)/t(r)$ where $t(1)$ is given by the runtime of the serial case (no parallelism) is plotted against thread number with the ideal speedup line shown. Loop parallelism is shown in orange, and work parallelism is shown in blue. Runtimes computed on crunchy1 (AMD Opteron 6272, 2.1 GHz).}
+  \label{fig:strong_scaling}
+\end{figure}
+To test the strong scaling of the parallelism options, we test how the runtime changes as the number of threads/processors increases for a fixed case. We consider the case of $n=32768$ points, $2048$ points in the smallest box, and $p=5$ moments, since Fig.~\ref{fig:varying_m} showed that both parallelisms yield speedup in this case with more threads decreasing runtime.  The left plot of Fig.~\ref{fig:strong_scaling} confirms the expectations that as the number of threads increases, the runtime should decrease. It also once again indicates that the work parallelism (ver2, blue) is a better choice than loop parallelism (ver1, orange) as the runtimes are consistently smaller.\\\\
+In order to determine how close to ideal speedup these parallelisms are, we consider the ratio of the serial runtime to the parallel runtime and ideally expect a linear increase with thread number (i.e., ideal speedup is $S(r) = t(1)/t(r) = r$ for $r$ threads). The right plot of Fig.~\ref{fig:strong_scaling} shows that the work parallelism yields closer to ideal speedup than loop parallelism, though both veer quite far from the ideal line (dotted, black) as the number of threads increases. For work parallelism, 16 threads yields a speedup that is about $\sim 10$ while for loop parallelism the speedup is only $\sim 5$. Once again, it is clear that work parallelism is the better of two parallelisms in this problem.
+
+\subsection{Weak Scaling}
+\begin{figure}
+  \centering
+  \includegraphics[width=0.48\textwidth]{./figures/weak_scalability.png} %
+  \includegraphics[width=0.48\textwidth]{./figures/weak_scalability2.png}
+  \caption{Results for the two parallelism options in the case of $n=8192r$ points for $r$ threads, $2048$ points in the smallest box, and $p=5$ moments. (Left) Algorithm runtime is plotted against thread number (from $2$ to $16$ threads), where problem size increases linearly with number of threads. (Right) The efficiency $t(1)/t(r)$, where $t(1)$ is given by the runtime of the serial code (no parallelism, $r=1$), is plotted against thread number $r$ with the ideal efficiency line shown. Loop parallelism is shown in orange, and work parallelism is shown in blue. Runtimes computed on crunchy1 (AMD Opteron 6272, 2.1 GHz).}
+  \label{fig:weak_scaling}
 \end{figure}
 
-\begin{figure}
-  \centering
-  \includegraphics[width=0.45\textwidth]{./figures/strong_scalability.png} %
-  \includegraphics[width=0.45\textwidth]{./figures/strong_scalability2.png} 
-\end{figure}
+\section{Conclusion and Discussion}
+In sum, we have successfully implemented the serial Barnes-Hut type tree-code as well as two parallelisms of it -- loop parallelism and work parallelism. Through various testing, including strong and weak scaling, it is clear that work parallelism yields consistent, overall superior speedups as compared to loop parallelism. The overhead costs of including parallel directives for small/low work loops is significant; \emph{how} significant is somewhat machine dependent, but it is consistently worse than work parallelism when the tree has close to maximal levels.\\\\
+The work parallelism implementation yields itself well to an extension of this project using MPI, where below level $O(\log(x))$ for $x$ cores the tree could be evenly distributed between cores and the work parallelism be implemented for each sub-tree at each core. The question would become how to minimize communication between cores, and what information is necessary to transfer at what points in time. 
 
-\begin{figure}
-  \centering
-  \includegraphics[width=0.45\textwidth]{./figures/weak_scalability.png} %
-  \includegraphics[width=0.45\textwidth]{./figures/weak_scalability2.png} 
-\end{figure}
+
 
 \bibliographystyle{plain}
 \bibliography{refs}
