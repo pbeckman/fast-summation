@@ -56,13 +56,19 @@
 
 \setlength\parindent{0pt}
 
-\title{High Performance Computing: Final Project Report}
-\author{Paul Beckman, Mariya Savinov}
-\date{March 28, 2022}
-
+%\title{High Performance Computing: Final Project Report}
+%\author{Paul Beckman, Mariya Savinov}
 \begin{document}
 
-\maketitle
+\begin{center}
+{\bf
+High Performance Computing: Final Project Report \\
+}
+Paul Beckman, Mariya Savinov\\
+Repo location: \url{https://github.com/pbeckman/fast-summation/}
+\end{center}
+
+%\maketitle
 
 \section{Introduction}
 Many settings in physics involve a collection of particles/masses interacting through conservative forces (forces which can be defined by some scalar potential function $u$), for example the electrostatic potential for a collection of point charges, or the gravitational potential for a collection of masses. In order to determine the particle dynamics, one must evaluate the total system potential at each particle point. As such, particularly when there are a large number $N$-many particles, we are interested in the rapid evaluation of this potential.
@@ -84,10 +90,10 @@ In order to reduce the cost of $\O(n^2)$ direct summation, Barnes and Hut \cite{
 The basic concept of the multipole tree-code we study here (adapted from Long Chen's FMM notes \cite{chenintroduction}) is to consider a point $y$ and Taylor expand $\phi(x_j - y)$ for collections of points $x_j$ around a \textit{center of mass} $x_*$ for which the ratio
 \begin{equation}
   \delta = \frac{x_j-x^*}{x^*-y}
-\end{equation} 
+\end{equation}
 is small. This results in the following expansion
 \begin{align}
-  \phi(x_j-y) 
+  \phi(x_j-y)
   &= \phi(x^*-y)\phi(1+\delta)\\
   & \approx \phi(x^*-y)\br{\sum_{m=0}^p \dfrac{\phi^{(m)}(1)}{m!}\delta^m + O(\delta^{p+1})}\\
   & = \sum_{m=0}^p a_m(x_j-x^*)S_m(x^*-y) + O(\delta^{p+1})
@@ -166,13 +172,13 @@ In order to determine how close to ideal speedup these parallelisms are, we cons
   \caption{Results for the two parallelism options in the case of $n=8192r$ points for $r$ threads, $2048$ points in the smallest box, and $p=5$ moments. (Left) Algorithm runtime is plotted against thread number (from $2$ to $16$ threads), where problem size increases linearly with number of threads. (Right) The efficiency $t(1)/t(r)$, where $t(1)$ is given by the runtime of the serial code (no parallelism, $r=1$), is plotted against thread number $r$ with the ideal efficiency line shown. Loop parallelism is shown in orange, and work parallelism is shown in blue. Runtimes computed on crunchy1 (AMD Opteron 6272, 2.1 GHz).}
   \label{fig:weak_scaling}
 \end{figure}
-In addition to the strong scaling study above, we also performed a weak scaling study in which we increase the number of threads proportionally with $n$. We consider $n=8192r$ points using $r$ threads with 2048 points in the smallest box and $p=5$ moments. 
+In addition to the strong scaling study above, we also performed a weak scaling study in which we increase the number of threads proportionally with $n$. We consider $n=8192r$ points using $r$ threads with 2048 points in the smallest box and $p=5$ moments.
 
 Under perfect weak scaling one would observe a constant runtime in this setting. Between 2 and 4 threads, however, there is a significant slowdown in which the efficiency is reduced to approximately one half for both modes of parallelism. This trend does not continue strongly for work parallelism, and we see only a modest increase in cost as we expand to 16 threads. Loop parallelism suffers a more dramatic performance loss at this higher level of parallelism. See Figure \ref{fig:weak_scaling}. These tests indicate that work parallelism achieves superior performance even in the weak scaling setting where the loops are scaled proportionally with the problem size.
 
 \section{Conclusion and Discussion}
 In sum, we have successfully implemented the serial Barnes-Hut type tree-code and parallelized the algorithm in two ways -- loop parallelism and work parallelism. Through various testing, including strong and weak scaling, it is clear that work parallelism yields consistent, overall superior speedups as compared to loop parallelism. The overhead costs of including parallel directives for small/low work loops is significant; \emph{how} significant is somewhat machine dependent, but it is consistently worse than work parallelism when the tree has close to maximal levels.\\\\
-The work parallelism implementation yields itself well to an extension of this project using MPI, where below level $O(\log(x))$ for $x$ cores the tree could be evenly distributed between cores and the work parallelism be implemented for each sub-tree at each core. The question would become how to minimize communication between cores, and what information is necessary to transfer at what points in time. 
+The work parallelism implementation yields itself well to an extension of this project using MPI, where below level $O(\log(x))$ for $x$ cores the tree could be evenly distributed between cores and the work parallelism be implemented for each sub-tree at each core. The question would become how to minimize communication between cores, and what information is necessary to transfer at what points in time.
 
 \bibliographystyle{plain}
 \bibliography{refs}
